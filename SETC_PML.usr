@@ -1,13 +1,13 @@
 c- constants -----------------------------------------------------------
 
-#define tSTATFREQ  uparam(1) /* output frequency for statistics */
-#define VISCFAC uparam(2)   /* viscosity multiplier at ouflow */
-#define RITAU uparam(3)     /* Ri_tau */
-#define UTARGET uparam(4)   /* u_target for top PML, positive */ 
-#define restart_inflow uparam(5) /* wether to read inflow2d.ini (2d) for restasting */
-#define iostep_inflow uparam(6)  /* frequency of output for inflow2d file */
-#define delta_fltr uparam(7) /* integration filter limit */
-#define restart_means uparam(8) /* Restart of means flag (reads means.ini binary files) */
+#define iostep_2d_avg_time  uparam(1) /* output frequency for statistics */
+#define VISCFAC uparam(2)             /* viscosity multiplier at ouflow */
+#define RITAU uparam(3)               /* Ri_tau */
+#define UTARGET uparam(4)             /* u_target for top PML, positive */ 
+#define restart_inflow uparam(5)      /* wether to read inflow2d.ini (2d) for restasting */
+#define iostep_inflow uparam(6)       /* frequency of output for inflow2d file */
+#define delta_fltr uparam(7)          /* integration filter limit */
+#define restart_means uparam(8)       /* Restart of means flag (reads means.ini binary files) */
 
 #define RE_TAU (1/param(2))
 c - mesh and buffer zones dimensions
@@ -269,6 +269,8 @@ C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
      &              ,  wo2(lx1,ly1,lz1,lelv)
      &              ,  wo3(lx1,ly1,lz1,lelv)
 
+      save igs_x
+
 c     perturbations
       real    up2avgx(ly1,lz1,lely,lelz)
      $    ,   vp2avgx(ly1,lz1,lely,lelz)
@@ -419,6 +421,8 @@ c     tke production and dissipation computation
      $     tx(lx1,ly1,lz1,lelv),
      $     ty(lx1,ly1,lz1,lelv),
      $     tz(lx1,ly1,lz1,lelv)
+
+      real t_tot, t_old, t_new
 c     ############################################################
 c
 c     ############################################################
@@ -480,13 +484,15 @@ c     ############################################################
       nt=nx1*ny1*nz1*nelt
       m=ny1*nz1*nely*nelz
 c
-      if(icalled.eq.0.and.restart_means.eq.0) then
+      if(icalled.eq.0) then
         call rzero(ravg,size(ravg))
+        call gtpp_gs_setup(igs_x,nelx     ,nely,nelz,1) ! x-avx
         atime = 0.
         timel = time
+        icalled = 1
 C         dtime = time - timel
 C         atime = atime + dtime
-      elseif()!check when to read previous means
+c      elseif()!check when to read previous means
 
       endif !(icalled.eq.0.and.restart_means.eq.0)
       dtime = time - timel
@@ -498,6 +504,7 @@ c     compute gradients
       call gradm1(vyx,vyy,vyz,vy)
       call gradm1(vzx,vzy,vzz,vz)
       call gradm1(tx,ty,tz,t(1,1,1,1,1))
+c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
         beta      = dtime / atime
@@ -559,4 +566,29 @@ c       Compute time-average of squared gradients
         call avg2(ravg(1,38),tz ,alpha,beta,n,'tz2m',ifverbose)
 
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
+c     ############################################################
       timel = time
+
+      if (istep.gt.0 .and. mod(istep,iostep_2d_avg_time).eq.0) then
+c     ############################################################
+c     spanwise averaging
+        do i =1,nstat
+          call planar_avg(stat(1,i),ravg(1,i),igs_x) !x averaging
+        enddo
+
+        if(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then   !if the last restart file was written during the current session, don't read it and keep on time averaging
+          call input_means(stat_old,time_old) !placeholder, fix this asap. time old should be the total time used for those means
+          t_new=time !assumes time_start=0
+          t_tot=t_new+t_old
+          alpha=t_new/t_tot
+          beta =t_old/t_tot
+          do i =1,nstat
+          call avg1(stat(1,i),stat_old(1,i),alpha,beta,n,'    ',.false.) !time averaging (n? shouldn't it be m?)
+          enddo
+        endif
+        call write_means(stat) !placeholder, fix this asap
+
+        
+
+
+
