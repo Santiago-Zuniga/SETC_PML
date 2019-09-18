@@ -2,40 +2,144 @@ c- constants -----------------------------------------------------------
 
 #define tSTATFREQ  uparam(1) /* output frequency for statistics */
 #define VISCFAC uparam(2)   /*viscosity multiplier at ouflow */
+#define RITAU uparam(3)     /*Ri_tau */
+#define UTARGET uparam(4)   /*u_target for top PML, positive */ 
 
+c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
-#define LENZ (32.*PI)
-
-
+#define ZLEN (32.*PI)
+#define XLEN 20.
+#define YLEN 20.
+#define ZBUFF (ZLEN-PI)
+#define YBUFF 12.
+C #define NUMBER_ELEMENTS_X 15
+C #define NUMBER_ELEMENTS_Y 44
+C #define NUMBER_ELEMENTS_Z 112
 
       subroutine uservp (ix,iy,iz,eg)
       include 'SIZE'
       include 'TOTAL'
       include 'NEKUSE'
-c###################################################################
-c###################################################################
+
 c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
 c
-      zout = LENZ-PI                               !<----------CHANGE!
+      zout = ZLEN-PI                               !<----------CHANGE!
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
          udiff = param(2)
          if (z.ge.zout) then
-           udiff =((param(2)*VISCFAC - param(2))/(LENZ-zout))
+           udiff =((param(2)*VISCFAC - param(2))/(ZLEN-zout))
      $            *(z-zout) + param(2)
          endif
       else if(ifield.eq.2)then                    ! temperature eqn
         utrans= param(7)
         udiff = param(8)
         if (z.ge.zout) then
-          udiff =((param(8)*VISCFAC - param(8))/(LENZ-zout))
+          udiff =((param(8)*VISCFAC - param(8))/(ZLEN-zout))
      $           *(z-zout) + param(8)
         endif
       endif
-c###################################################################
-c###################################################################
+
       return
       end
+c-----------------------------------------------------------------------
+      subroutine userf  (ix,iy,iz,eg)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+      include 'ZPER'  ! for nelx,nely,nelz
 
+
+      real*8 egrav(3)
+
+c     HYDROSTATIC PRESSURE VARIABLES
+      common /TBAR/ tempbar(ly1,lely)
+     &             ,w1t(ly1,lely)
+     &             ,w2t(ly1,lely)
+c
+      integer ex,ey,ez
+
+c     BUFFER ZONE VARIABLES
+      real*8 sigma(3),sigmam1(3),sigmam2(3),beta,ybuff
+     $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
+
+c     MESH VARIABLES
+      egrav(1) = 0.0                !x: Spanwise direction
+      egrav(2) = (-1)*RITAU         !y: Wall-normal direction
+      egrav(3) = 1.0                !z: Streamwise direction
+
+c     Note: this is an acceleration term, NOT a force!
+c     Thus, ffx will subsequently be multiplied by rho(x,t).
+      call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+
+      ffx = temp*egrav(1)
+      ffy = (temp - tempbar(iy,ey))*egrav(2)
+      ffz = temp*egrav(3)
+c     ############################################################
+c     ############################################################
+
+c     ############################################################
+c     ############################################################
+c     Buffer zones
+      sigmam1(1) = 0.0                          !<-----------------CHANGE!
+      sigmam1(2) = 1.0                          !<-----------------CHANGE!
+      sigmam1(3) = 0.0                          !<-----------------CHANGE!
+
+      sigmam2(1) = 0.0                          !<-----------------CHANGE!
+      sigmam2(2) = 0.0                          !<-----------------CHANGE!
+      sigmam2(3) = 0.0                          !<-----------------CHANGE!
+
+      beta = 2.0                                !<-----------------CHANGE!
+
+      umean1(1) = 0.0                           !<-----------------CHANGE! 
+      umean1(2) =-UTARGET                       
+      umean1(3) = 0.0                           !<-----------------CHANGE! 
       
+      umean2(1) = 0.0                           !<-----------------CHANGE! 
+      umean2(2) = 0.0                           !<-----------------CHANGE! 
+      umean2(3) = 0.0                           !<-----------------CHANGE! 
+
+      m = (YLEN-YBUFF)/(ZLEN-ZBUFF)
+      zz = (y-YBUFF)/m + ZBUFF
+      yy = m * (z-ZBUFF) + YBUFF
+
+c     ###############
+c     Top buffer zone
+      sigma(1) = 0.0
+      sigma(2) = 0.0
+      sigma(3) = 0.0
+      if (y.ge.YBUFF.and.z.le.zz) then
+        sigma(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+
+        ffx = ffx - sigma(1) * (ux - umean1(1))
+        ffy = ffy - sigma(2) * (uy - umean1(2)) 
+        ffz = ffz - sigma(3) * (uz - umean1(3))
+      endif
+
+c     ###################
+c     Outflow buffer zone
+      if(.FALSE.) then
+          sigma(1) = 0.0
+          sigma(2) = 0.0
+          sigma(3) = 0.0
+          all get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+          vzout = vzout_pl(ix,iy,ex,ey)
+          if (z.ge.ZBUFF.and.y.lt.yy.and.vzout.lt.0.0) then
+            sigma(1) = sigmam2(1)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+            sigma(2) = sigmam2(2)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+            sigma(3) = sigmam2(3)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+
+            ffx = ffx - sigma(1) * (ux - umean2(1))
+            ffy = ffy - sigma(2) * (uy - umean2(2))
+            ffz = ffz - sigma(3) * (uz - umean2(3))
+          endif
+      endif
+c     ####################
+
+
+      return
+      end
+c-----------------------------------------------------------------------
