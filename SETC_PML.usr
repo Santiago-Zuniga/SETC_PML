@@ -1,10 +1,15 @@
 c- constants -----------------------------------------------------------
 
 #define tSTATFREQ  uparam(1) /* output frequency for statistics */
-#define VISCFAC uparam(2)   /*viscosity multiplier at ouflow */
-#define RITAU uparam(3)     /*Ri_tau */
-#define UTARGET uparam(4)   /*u_target for top PML, positive */ 
+#define VISCFAC uparam(2)   /* viscosity multiplier at ouflow */
+#define RITAU uparam(3)     /* Ri_tau */
+#define UTARGET uparam(4)   /* u_target for top PML, positive */ 
+#define restart_inflow uparam(5) /* wether to read inflow2d.ini (2d) for restasting */
+#define iostep_inflow uparam(6)  /* frequency of output for inflow2d file */
+#define delta_fltr uparam(7) /* integration filter limit */
+#define restart_means uparam(8) /* Restart of means flag (reads means.ini binary files) */
 
+#define RE_TAU (1/param(2))
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
 #define ZLEN (32.*PI)
@@ -12,9 +17,11 @@ c - mesh and buffer zones dimensions
 #define YLEN 20.
 #define ZBUFF (ZLEN-PI)
 #define YBUFF 12.
-C #define NUMBER_ELEMENTS_X 15
-C #define NUMBER_ELEMENTS_Y 44
-C #define NUMBER_ELEMENTS_Z 112
+
+c - Iflow dimensions
+#define nelxin 15 /*number of elements of inflow array */
+#define nelyin 9
+#define nelzin 28
 
       subroutine uservp (ix,iy,iz,eg)
       include 'SIZE'
@@ -138,8 +145,418 @@ c     Outflow buffer zone
           endif
       endif
 c     ####################
-
-
       return
       end
 c-----------------------------------------------------------------------
+      subroutine userq  (ix,iy,iz,eg)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      integer e,f,eg
+c     e = gllel(eg)
+ 
+      qvol   = 0.0
+      source = 0.0
+
+      return
+      end
+
+c-----------------------------------------------------------------------
+
+      subroutine userchk
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'  ! for nelx,nely,nelz
+
+c     ############################################################
+c     INTERPOLATE EXTERNAL INFLOW FILE AND SETS INFLOW PLANE
+      integer nelin,nel_slab,nin
+      real rlenz,z_inflow,dz_inflow
+      real dtimestep
+      integer set_IC_flag
+
+c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
+      parameter(set_IC_flag=0)                           !<----- CHANGE!
+
+      parameter(nelin=nelxin*nelyin*nelzin)
+      parameter(nel_slab=nelxin*nelyin)
+      parameter(nin = nelin*lx1*ly1*lz1)
+
+      real vxin(lx1,ly1,lz1,nelin)
+     $    ,vyin(lx1,ly1,lz1,nelin)
+     $    ,vzin(lx1,ly1,lz1,nelin)
+     $    ,tin(lx1,ly1,lz1,nelin)
+
+      common /inflow_pl/ vxin_pl(lx1,ly1,nel_slab)
+     $                  ,vyin_pl(lx1,ly1,nel_slab)
+     $                  ,vzin_pl(lx1,ly1,nel_slab)
+     $                  ,tin_pl(lx1,ly1,nel_slab)
+      save z_inflow
+
+c     ############################################################
+c     DEPTH-AVERAGED STATISTICS VARIABLES
+
+c     Output frequency of span-time-averaged .fld files
+c     and means.* binary files
+      integer iostep_2d_avg_time
+      parameter( iostep_2d_avg_time= 1000 ) !<-----------CHANGE!
+
+c     Output frequency of span-averaged .fld files
+      integer iostep_2d
+      parameter( iostep_2d= 1000 )          !<-----------CHANGE!
+
+c     Integration filter: The moments of velocity and concentration
+c     are computed from z=0 to z=z_delta_fltr where z_delta_fltr
+c     is the wall-normal location where we find a concentration
+c     c<=delta_fltr
+
+
+      real timem,atimem,timelm,dtimem
+
+c     spanwise-averaged arrays
+      real    yavgx(ny1,nz1,lely,lelz)
+     $    ,   zavgx(ny1,nz1,lely,lelz)
+
+c     spanwise-averaged arrays
+C       common /avg2dtime/ 
+C      $        uavgx(ly1,lz1,lely,lelz)
+C      $    ,   vavgx(ly1,lz1,lely,lelz)
+C      $    ,   wavgx(ly1,lz1,lely,lelz)
+C      $    ,   tavgx(ly1,lz1,lely,lelz)
+C      $    ,   w1(ly1,lz1,lely,lelz)
+C      $    ,   w2(ly1,lz1,lely,lelz)
+C      $    ,   u2avgx(ly1,lz1,lely,lelz)
+C      $    ,   v2avgx(ly1,lz1,lely,lelz)
+C      $    ,   w2avgx(ly1,lz1,lely,lelz)
+C      $    ,   t2avgx(ly1,lz1,lely,lelz)
+C      $    ,   uvavgx(ly1,lz1,lely,lelz)
+C      $    ,   uwavgx(ly1,lz1,lely,lelz)
+C      $    ,   utavgx(ly1,lz1,lely,lelz)
+C      $    ,   vwavgx(ly1,lz1,lely,lelz)
+C      $    ,   vtavgx(ly1,lz1,lely,lelz)
+C      $    ,   wtavgx(ly1,lz1,lely,lelz)
+C      $    ,   uxavgx(ly1,lz1,lely,lelz)
+C      $    ,   uyavgx(ly1,lz1,lely,lelz)
+C      $    ,   uzavgx(ly1,lz1,lely,lelz)
+C      $    ,   vxavgx(ly1,lz1,lely,lelz)
+C      $    ,   vyavgx(ly1,lz1,lely,lelz)
+C      $    ,   vzavgx(ly1,lz1,lely,lelz)
+C      $    ,   wxavgx(ly1,lz1,lely,lelz)
+C      $    ,   wyavgx(ly1,lz1,lely,lelz)
+C      $    ,   wzavgx(ly1,lz1,lely,lelz)
+C      $    ,   txavgx(ly1,lz1,lely,lelz)
+C      $    ,   tyavgx(ly1,lz1,lely,lelz)
+C      $    ,   tzavgx(ly1,lz1,lely,lelz)
+C      $    ,   ux2avgx(ly1,lz1,lely,lelz)
+C      $    ,   uy2avgx(ly1,lz1,lely,lelz)
+C      $    ,   uz2avgx(ly1,lz1,lely,lelz)
+C      $    ,   vx2avgx(ly1,lz1,lely,lelz)
+C      $    ,   vy2avgx(ly1,lz1,lely,lelz)
+C      $    ,   vz2avgx(ly1,lz1,lely,lelz)
+C      $    ,   wx2avgx(ly1,lz1,lely,lelz)
+C      $    ,   wy2avgx(ly1,lz1,lely,lelz)
+C      $    ,   wz2avgx(ly1,lz1,lely,lelz)
+C      $    ,   tx2avgx(ly1,lz1,lely,lelz)
+C      $    ,   ty2avgx(ly1,lz1,lely,lelz)
+C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
+      parameter(nstat=38)
+      real ravg(lx1*ly1*lz1*lelt,nstat)
+      real stat(lx1*ly1*lz1*lelt,nstat)
+      save ravg, stat
+      logical ifverbose
+      common /gaaa/    wo1(lx1,ly1,lz1,lelv)
+     &              ,  wo2(lx1,ly1,lz1,lelv)
+     &              ,  wo3(lx1,ly1,lz1,lelv)
+
+c     perturbations
+      real    up2avgx(ly1,lz1,lely,lelz)
+     $    ,   vp2avgx(ly1,lz1,lely,lelz)
+     $    ,   wp2avgx(ly1,lz1,lely,lelz)
+     $    ,   tp2avgx(ly1,lz1,lely,lelz)
+     $    ,   uvpavgx(ly1,lz1,lely,lelz)
+     $    ,   uwpavgx(ly1,lz1,lely,lelz)
+     $    ,   utpavgx(ly1,lz1,lely,lelz)
+     $    ,   vwpavgx(ly1,lz1,lely,lelz)
+     $    ,   vtpavgx(ly1,lz1,lely,lelz)
+     $    ,   wtpavgx(ly1,lz1,lely,lelz)
+     $    ,   uxp2avgx(ly1,lz1,lely,lelz)
+     $    ,   uyp2avgx(ly1,lz1,lely,lelz)
+     $    ,   uzp2avgx(ly1,lz1,lely,lelz)
+     $    ,   vxp2avgx(ly1,lz1,lely,lelz)
+     $    ,   vyp2avgx(ly1,lz1,lely,lelz)
+     $    ,   vzp2avgx(ly1,lz1,lely,lelz)
+     $    ,   wxp2avgx(ly1,lz1,lely,lelz)
+     $    ,   wyp2avgx(ly1,lz1,lely,lelz)
+     $    ,   wzp2avgx(ly1,lz1,lely,lelz)
+     $    ,   txp2avgx(ly1,lz1,lely,lelz)
+     $    ,   typ2avgx(ly1,lz1,lely,lelz)
+     $    ,   tzp2avgx(ly1,lz1,lely,lelz)
+     $    ,   kavgx(ly1,lz1,lely,lelz)
+     $    ,   prodavgx(ly1,lz1,lely,lelz)
+     $    ,   dissavgx(ly1,lz1,lely,lelz)
+     $    ,   rigavgx(ly1,lz1,lely,lelz)
+     $    ,   urmsavgx(ly1,lz1,lely,lelz)
+     $    ,   vrmsavgx(ly1,lz1,lely,lelz)
+     $    ,   wrmsavgx(ly1,lz1,lely,lelz)
+     $    ,   trmsavgx(ly1,lz1,lely,lelz)
+
+c     spanwise-averaged arrays for shape functions
+      real    eta_fltr(ny1,nz1,lely,lelz)
+     $    ,   wavgx_w_fltr(ny1,nz1,lely,lelz)
+     $    ,   tavgx_t_fltr(ny1,nz1,lely,lelz)
+     $    ,   kavgx_k_fltr(ny1,nz1,lely,lelz)
+     $    ,   vwpavgx_w2_fltr(ny1,nz1,lely,lelz)
+     $    ,   vtpavgx_wt_fltr(ny1,nz1,lely,lelz)
+     $    ,   prodavgx_hw3_fltr(ny1,nz1,lely,lelz)
+     $    ,   dissavgx_hw3_fltr(ny1,nz1,lely,lelz)
+c
+c     spanwise-averaged arrays (non-time averaged)
+      real    uavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   tavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   u2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   v2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   w2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   t2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uvavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uwavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   utavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vwavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vtavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wtavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uxavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uyavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uzavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vxavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vyavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vzavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wxavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wyavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wzavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   txavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   tyavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   tzavgx_notime(ly1,lz1,lely,lelz)
+     $    ,   ux2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uy2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   uz2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vx2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vy2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   vz2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wx2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wy2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   wz2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   tx2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   ty2avgx_notime(ly1,lz1,lely,lelz)
+     $    ,   tz2avgx_notime(ly1,lz1,lely,lelz)
+
+c     depth-averaged arrays
+      real zavgxy(nz1,lelz)
+
+c     depth-averaged arrays
+      real uavgxy(nz1,lelz)
+     $    ,vavgxy(nz1,lelz)
+     $    ,wavgxy(nz1,lelz)
+     $    ,tavgxy(nz1,lelz)
+     $    ,w2avgxy(nz1,lelz)
+     $    ,wtavgxy(nz1,lelz)
+     $    ,wkavgxy(nz1,lelz)
+     $    ,prodavgxy(nz1,lelz)
+     $    ,dissavgxy(nz1,lelz)
+
+c     depth-averaged arrays (filtered)
+      real    uavgxy_fltr(nz1,lelz)
+     $       ,vavgxy_fltr(nz1,lelz)
+     $       ,wavgxy_fltr(nz1,lelz)
+     $       ,tavgxy_fltr(nz1,lelz)
+     $       ,w2avgxy_fltr(nz1,lelz)
+     $       ,wtavgxy_fltr(nz1,lelz)
+     $       ,wkavgxy_fltr(nz1,lelz)
+     $       ,prodavgxy_fltr(nz1,lelz)
+     $       ,dissavgxy_fltr(nz1,lelz)
+c
+
+c     dWh/dz (from cons. of mass dUh/dz=we)
+      real    dzwavgxy(nz1,lelz),
+     $        dzwavgxy_fltr(nz1,lelz)
+c
+c     Interface position array (intr) and threshold delta
+      real intr(nz1,lelz)
+
+c     average in time variables
+      integer icalled
+      save    icalled
+      data    icalled /0/
+
+      real atime,timel
+      save atime,timel
+      real alpha,beta
+      logical ifverbose
+      integer n,nt
+
+      integer icnt_time
+      save    icnt_time
+      data    icnt_time /0/
+
+      integer icnt
+      save    icnt
+      data    icnt /0/
+c
+      character*32 istepc,outfile
+c
+c     Gradient arrays for shear velocity, 
+c     tke production and dissipation computation
+      real vxx(lx1,ly1,lz1,lelv),
+     $     vxy(lx1,ly1,lz1,lelv),
+     $     vxz(lx1,ly1,lz1,lelv),
+     $     vyx(lx1,ly1,lz1,lelv),
+     $     vyy(lx1,ly1,lz1,lelv),
+     $     vyz(lx1,ly1,lz1,lelv),
+     $     vzx(lx1,ly1,lz1,lelv),
+     $     vzy(lx1,ly1,lz1,lelv),
+     $     vzz(lx1,ly1,lz1,lelv),
+     $     tx(lx1,ly1,lz1,lelv),
+     $     ty(lx1,ly1,lz1,lelv),
+     $     tz(lx1,ly1,lz1,lelv)
+c     ############################################################
+c
+c     ############################################################
+c     HYDROSTATIC PRESSURE VARIABLES
+      common /TBAR/ tempbar(ly1,lely)
+     $             ,w1t(ly1,lely)
+     $             ,w2t(ly1,lely)
+c
+cc     ############################################################
+cc     BUFFER REGION VARIABLES (by JS, has not been modified)
+c      common /outflow_pl/ vzout_pl(lx1,ly1,lelx,lely)
+c      real vzout_pldum(lx1,ly1,lelx,lely)
+c      integer ex,ey,ez,eg
+c      integer iostep_outflow,iostep_outflow_notime
+c      real vmax,vmaxdum,zmax,wmin,wmindum,ymin
+c
+cc     Output frequency of outflow boundaries statistics    
+c      parameter(iostep_outflow = 1000)               !<----- CHANGE!
+c      parameter(iostep_outflow_notime = 1000)        !<----- CHANGE!
+cc     ############################################################
+
+c     ############################################################
+c
+c     INTERPOLATE EXTERNAL INFLOW FILE AND SETS INFLOW PLANE
+c
+c     This code is made for a mesh composed of only one box.
+c     Computes the inlet boundary condition for the next time step
+c     interpolating the solution for a TC with fixed mean 
+c     streamwise velocity and concentration
+
+      dtimestep = abs(PARAM(12))
+c     READ INFLOW
+      if (istep.eq.0) then
+        call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
+        if (set_IC_flag.eq.1) then
+          call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
+     $               ,nel_slab)
+        endif
+      endif
+
+      call interpolate_inflow(vxin,vyin,vzin,tin
+     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
+     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
+     $          ,dtimestep,restart_inflow)
+
+      if (mod(istep,iostep_inflow).eq.0) then
+        call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
+     $                       ,z_inflow)
+      endif
+c     ############################################################
+c     OUTPUT INITIAL CONDITION
+      if (istep.eq.0) then
+        ifxyo = .true.
+        call prepost(.true.,'   ' )
+        ifxyo = .false.
+      endif
+c     ############################################################
+      n=nx1*ny1*nz1*nelv  
+      nt=nx1*ny1*nz1*nelt
+      m=ny1*nz1*nely*nelz
+c
+      if(icalled.eq.0.and.restart_means.eq.0) then
+        call rzero(ravg,size(ravg))
+        atime = 0.
+        timel = time
+C         dtime = time - timel
+C         atime = atime + dtime
+      elseif()!check when to read previous means
+
+      endif !(icalled.eq.0.and.restart_means.eq.0)
+      dtime = time - timel
+      atime = atime + dtime
+c     ############################################################
+
+c     compute gradients
+      call gradm1(vxx,vxy,vxz,vx)
+      call gradm1(vyx,vyy,vyz,vy)
+      call gradm1(vzx,vzy,vzz,vz)
+      call gradm1(tx,ty,tz,t(1,1,1,1,1))
+c     averaging over time
+      if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
+        beta      = dtime / atime
+        alpha     = 1. - beta
+
+        ifverbose = .false.
+c       Compute time-average of u,v,w and t       
+        call avg1(ravg(1,1),vx,alpha,beta,n,'uavg',ifverbose)
+        call avg1(ravg(1,2),vy,alpha,beta,n,'vavg',ifverbose) 
+        call avg1(ravg(1,3),vz,alpha,beta,n,'wavg',ifverbose) 
+        call avg1(ravg(1,4),t, alpha,beta,n,'tavg',ifverbose)
+
+c       Compute time-average of u^2,v^2,w^2 and t^2     
+        call avg2(ravg(1,5),vx,alpha,beta,n,'u2mm',ifverbose)
+        call avg2(ravg(1,6),vy,alpha,beta,n,'v2mm',ifverbose) 
+        call avg2(ravg(1,7),vz,alpha,beta,n,'w2mm',ifverbose) 
+        call avg2(ravg(1,8),t ,alpha,beta,n,'t2mm',ifverbose)
+
+c       Compute time-average of cross products
+        call avg3(ravg(1,9 ),vx,vy,alpha,beta,n,'uvmm',ifverbose)
+        call avg3(ravg(1,10),vx,vz,alpha,beta,n,'uwmm',ifverbose)
+        call avg3(ravg(1,11),vx, t,alpha,beta,n,'utmm',ifverbose)
+        call avg3(ravg(1,12),vy,vz,alpha,beta,n,'vwmm',ifverbose)
+        call avg3(ravg(1,13),vt, t,alpha,beta,n,'vtmm',ifverbose)
+        call avg3(ravg(1,14),vz, t,alpha,beta,n,'wtmm',ifverbose)
+
+c       Compute time-average of gradients     
+        call avg1(ravg(1,15),vxx,alpha,beta,n,'uxmm',ifverbose)
+        call avg1(ravg(1,16),vxy,alpha,beta,n,'uymm',ifverbose)
+        call avg1(ravg(1,17),vxz,alpha,beta,n,'uzmm',ifverbose)
+
+        call avg1(ravg(1,18),vyx,alpha,beta,n,'vxmm',ifverbose)
+        call avg1(ravg(1,19),vyy,alpha,beta,n,'vymm',ifverbose)
+        call avg1(ravg(1,20),vyz,alpha,beta,n,'vzmm',ifverbose)
+
+        call avg1(ravg(1,21),vzx,alpha,beta,n,'wxmm',ifverbose)
+        call avg1(ravg(1,22),vzy,alpha,beta,n,'wymm',ifverbose)
+        call avg1(ravg(1,23),vzz,alpha,beta,n,'wzmm',ifverbose)
+
+        call avg1(ravg(1,24),tx ,alpha,beta,n,'txmm',ifverbose)
+        call avg1(ravg(1,25),ty ,alpha,beta,n,'tymm',ifverbose)
+        call avg1(ravg(1,26),tz ,alpha,beta,n,'tzmm',ifverbose)
+
+c       Compute time-average of squared gradients
+        call avg2(ravg(1,27),vxx,alpha,beta,n,'ux2m',ifverbose)
+        call avg2(ravg(1,28),vxy,alpha,beta,n,'uy2m',ifverbose)
+        call avg2(ravg(1,29),vxz,alpha,beta,n,'uz2m',ifverbose)
+
+        call avg2(ravg(1,30),vyx,alpha,beta,n,'vx2m',ifverbose)
+        call avg2(ravg(1,31),vyy,alpha,beta,n,'vy2m',ifverbose)
+        call avg2(ravg(1,32),vyz,alpha,beta,n,'vz2m',ifverbose)
+
+        call avg2(ravg(1,33),vzx,alpha,beta,n,'wx2m',ifverbose)
+        call avg2(ravg(1,34),vzy,alpha,beta,n,'wy2m',ifverbose)
+        call avg2(ravg(1,35),vzz,alpha,beta,n,'wz2m',ifverbose)
+
+        call avg2(ravg(1,36),tx ,alpha,beta,n,'tx2m',ifverbose)
+        call avg2(ravg(1,37),ty ,alpha,beta,n,'ty2m',ifverbose)
+        call avg2(ravg(1,38),tz ,alpha,beta,n,'tz2m',ifverbose)
+
+      endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
+      timel = time
