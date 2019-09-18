@@ -1,0 +1,41 @@
+c- constants -----------------------------------------------------------
+
+#define tSTATFREQ  uparam(1) /* output frequency for statistics */
+#define VISCFAC uparam(2)   /*viscosity multiplier at ouflow */
+
+#define PI (4.*atan(1.))
+#define LENZ (32.*PI)
+
+
+
+      subroutine uservp (ix,iy,iz,eg)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+c###################################################################
+c###################################################################
+c     TURBULENT OUTFLOW
+c     Sets low Re number in range [zout;lenz]
+c
+      zout = LENZ-PI                               !<----------CHANGE!
+      if(ifield.eq.1)then                          ! momentum equation
+         utrans= param(1)
+         udiff = param(2)
+         if (z.ge.zout) then
+           udiff =((param(2)*VISCFAC - param(2))/(LENZ-zout))
+     $            *(z-zout) + param(2)
+         endif
+      else if(ifield.eq.2)then                    ! temperature eqn
+        utrans= param(7)
+        udiff = param(8)
+        if (z.ge.zout) then
+          udiff =((param(8)*VISCFAC - param(8))/(LENZ-zout))
+     $           *(z-zout) + param(8)
+        endif
+      endif
+c###################################################################
+c###################################################################
+      return
+      end
+
+      
