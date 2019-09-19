@@ -15,7 +15,7 @@ c - mesh and buffer zones dimensions
 #define ZLEN (32.*PI)
 #define XLEN (8.*PI/3.)
 #define YLEN 20.
-#define ZBUFF (ZLEN-PI)
+#define ZBUFF (31.*PI)
 #define YBUFF 12.
 
 c - Iflow dimensions
@@ -32,21 +32,21 @@ c - Iflow dimensions
 
 c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
+      real zout
        
       zout = ZLEN-PI                               !<----------CHANGE!
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
          udiff = param(2)
          if (z.ge.zout)then
-               udiff =((param(2)*VISCFAC-param(2))/(ZLEN-zout))
-c               udiff = udiff * (z-zout) + param(2)
-C       $            *(z-zout) + param(2)
+               udiff =((param(2)*VISCFAC-param(2))/PI)
+     $            *(z-zout) + param(2)
          endif
       else if(ifield.eq.2)then                    ! temperature eqn
         utrans= param(7)
         udiff = param(8)
         if (z.ge.zout) then
-          udiff =((param(8)*VISCFAC - param(8))/(ZLEN-zout))
+          udiff =((param(8)*VISCFAC - param(8))/PI)
      $           *(z-zout) + param(8)
         endif
       endif
@@ -71,7 +71,7 @@ c
       integer ex,ey,ez
 
 c     BUFFER ZONE VARIABLES
-      real*8 sigma(3),sigmam1(3),sigmam2(3),beta,ybuff
+      real*8 sigma2(3),sigmam1(3),sigmam2(3),beta,ybuff  !changed sigma to sigma2
      $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
 
 c     MESH VARIABLES
@@ -110,43 +110,43 @@ c     Buffer zones
       umean2(2) = 0.0                           !<-----------------CHANGE! 
       umean2(3) = 0.0                           !<-----------------CHANGE! 
 
-      m = (YLEN-YBUFF)/(ZLEN-ZBUFF)
+      m=(YLEN-YBUFF)/(ZLEN-ZBUFF)
       zz = (y-YBUFF)/m + ZBUFF
       yy = m * (z-ZBUFF) + YBUFF
 
 c     ###############
 c     Top buffer zone
-      sigma(1) = 0.0
-      sigma(2) = 0.0
-      sigma(3) = 0.0
+      sigma2(1) = 0.0
+      sigma2(2) = 0.0
+      sigma2(3) = 0.0
       if (y.ge.YBUFF.and.z.le.zz) then
-        sigma(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
 
-        ffx = ffx - sigma(1) * (ux - umean1(1))
-        ffy = ffy - sigma(2) * (uy - umean1(2)) 
-        ffz = ffz - sigma(3) * (uz - umean1(3))
+        ffx = ffx - sigma2(1) * (ux - umean1(1))
+        ffy = ffy - sigma2(2) * (uy - umean1(2)) 
+        ffz = ffz - sigma2(3) * (uz - umean1(3))
       endif
 
 c     ###################
 c     Outflow buffer zone
-      if(.FALSE.) then
-          sigma(1) = 0.0
-          sigma(2) = 0.0
-          sigma(3) = 0.0
-          all get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-          vzout = vzout_pl(ix,iy,ex,ey)
-          if (z.ge.ZBUFF.and.y.lt.yy.and.vzout.lt.0.0) then
-            sigma(1) = sigmam2(1)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
-            sigma(2) = sigmam2(2)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
-            sigma(3) = sigmam2(3)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+C       if(.FALSE.) then
+C           sigma2(1) = 0.0
+C           sigma2(2) = 0.0
+C           sigma2(3) = 0.0
+C           call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+C           vzout = vzout_pl(ix,iy,ex,ey)
+C           if (z.ge.ZBUFF.and.y.lt.yy.and.vzout.lt.0.0) then
+C             sigma2(1) = sigmam2(1)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+C             sigma2(2) = sigmam2(2)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+C             sigma2(3) = sigmam2(3)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
 
-            ffx = ffx - sigma(1) * (ux - umean2(1))
-            ffy = ffy - sigma(2) * (uy - umean2(2))
-            ffz = ffz - sigma(3) * (uz - umean2(3))
-          endif
-      endif
+C             ffx = ffx - sigma2(1) * (ux - umean2(1))
+C             ffy = ffy - sigma2(2) * (uy - umean2(2))
+C             ffz = ffz - sigma2(3) * (uz - umean2(3))
+C           endif
+C       endif
 c     ####################
       return
       end
@@ -400,7 +400,6 @@ c     average in time variables
       real atime,timel
       save atime,timel
       real alpha,beta
-      logical ifverbose
       integer n,nt
 
       integer icnt_time
@@ -474,9 +473,9 @@ c     READ INFLOW
       call interpolate_inflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
      $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-     $          ,dtimestep,restart_inflow)
+     $          ,dtimestep,int(restart_inflow))
 
-      if (mod(istep,iostep_inflow).eq.0) then
+      if (mod(istep,int(iostep_inflow)).eq.0) then
         call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
      $                       ,z_inflow)
       endif
@@ -577,7 +576,7 @@ c       Compute time-average of squared gradients
 c     ############################################################
       timel = time
 
-      if (istep.gt.0 .and. mod(istep,iostep_2d_avg_time).eq.0) then
+      if (istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     ############################################################
 c     spanwise averaging
         do i =1,nstat
@@ -597,8 +596,9 @@ c     spanwise averaging
           call copy(w3,stat2d(1,1,1,i),m) 
           write(58) w3
          enddo
+        endif
 
-
+      endif
 
 
 
@@ -723,7 +723,7 @@ c
           y = y/rrleny
           yc(i,1)=y*nelytot-24
         endif
-        xc(i,1) =   * xc(i,1)
+        xc(i,1) =  XLEN * xc(i,1)
 c        xc(i,1) =  2.0 * PI * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
       enddo
@@ -836,15 +836,15 @@ c     ##############################################################
 c----------------------------------------------------------------
       subroutine interpolate_inflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-     $           ,nelin,nel_slab,nelzin,z_inflow,rlenz
-     $          ,dtimestep,restart_inflow)
+     $           ,nelin,nel_slab,nelzin1,z_inflow,rlenz
+     $          ,dtimestep,restart_inflow1)
 
       include 'SIZE'
       include 'TOTAL'
       include 'ZPER'
 
-      integer step_inflow,nelzin,nel_slab,nelin
-      integer restart_inflow
+      integer step_inflow,nelzin1,nel_slab,nelin
+      integer restart_inflow1
       real rlenz,z_inflow,dz_inflow
       real dtimestep
 
@@ -861,7 +861,7 @@ c----------------------------------------------------------------
 
 
       real zz(nz1,nelz),w1(nz1,nelz),w2(nz1,nelz)
-      real zzin(nz1,nelzin)
+      real zzin(nz1,nelzin1)
       integer nzin,flagin,e,m
 
       real vzinavg,uadum,w1in,z_sup,z_inf
@@ -877,14 +877,14 @@ c----------------------------------------------------------------
 c     ---------------------------------------------------------
       m = nx1*ny1*nel_slab
       call planar_average_z(zz,zm1,w1,w2)
-      nzin=nelzin*nz1
+      nzin=nelzin1*nz1
       call copy(zzin,zz,nzin)
-      if (istep.eq.0.and.restart_inflow.eq.0) then
+      if (istep.eq.0.and.restart_inflow1.eq.0) then
 c        This part could be done only by nid.eq.0 
 c        but I'm tired of coding 
          z_inflow = rlenz
          do e=1,nel_slab
-          e_pl = nel_slab*(nelzin-1) + e
+          e_pl = nel_slab*(nelzin1-1) + e
           do j=1,ny1
             do i=1,nx1
               vxin_pl(i,j,e) = vxin(i,j,nz1,e_pl)
@@ -895,7 +895,7 @@ c        but I'm tired of coding
           enddo
          enddo
 
-      elseif (istep.eq.0.and.restart_inflow.eq.1) then
+      elseif (istep.eq.0.and.restart_inflow1.eq.1) then
 c       This part has to be done by only nid.eq.0
 c       (could generate reading issues otherwise)
         z_inflow = 0.0
@@ -910,7 +910,7 @@ c       (could generate reading issues otherwise)
         call rzero(tin_pl_dum,m)
         if (nid.eq.0) then
           write(*,*)'###### READING 2D INFLOW FILE FOR RESTART ####'
-          open(unit=58,file='inflow2d.ini',form='binary')
+          open(unit=58,file='inflow2d.ini',form='unformatted')
           read(58) z_inflow_dum
           read(58) vxin_pl_dum,vyin_pl_dum,vzin_pl_dum,tin_pl_dum
           close(58)
@@ -937,7 +937,7 @@ c        but I'm tired of coding
 
 
         flagin=0
-        do e=nelzin,1,-1
+        do e=nelzin1,1,-1
           do k=nz1,1,-1
             if (z_inflow.gt.zzin(k,e).and.flagin.eq.0) then
               z_sup = zzin(k+1,e)
@@ -1010,7 +1010,7 @@ c    ----------------------------------------------------------
         write(istepc_inflow,'(i32)') istep
         istepc_inflow=adjustl(istepc_inflow)
         icfile_inflow=trim('inflow2d'//'.'//trim(istepc_inflow))
-        open(unit=58,file=icfile_inflow,form='binary')
+        open(unit=58,file=icfile_inflow,form='unformatted')
         write(58) z_inflow
         write(58) vxin_pl,vyin_pl,vzin_pl,tin_pl
         close(58)
