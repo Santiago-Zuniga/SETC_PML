@@ -22,7 +22,7 @@ c - Iflow dimensions
 #define nelxin 15 /*number of elements of inflow array */
 #define nelyin 9
 #define nelzin 28
-#define hf 2.0 /*height of inflow domain*/
+c#define hf 2.0 /*height of inflow domain*/
 
 
       subroutine uservp (ix,iy,iz,eg)
@@ -463,22 +463,22 @@ c     streamwise velocity and concentration
 
       dtimestep = abs(PARAM(12))
 c     READ INFLOW
-      if (istep.eq.0) then
-        call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
-        if (set_IC_flag.eq.1) then
-          call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
-     $               ,nel_slab)
-        endif
-      endif
+c      if (istep.eq.0) then
+c        call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
+c        if (set_IC_flag.eq.1) then
+c          call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
+c     $               ,nel_slab)
+c        endif
+c      endif
 
-      call interpolateinflow(vxin,vyin,vzin,tin
-     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-     $          ,dtimestep,int(restart_inflow))
+c     call interpolateinflow(vxin,vyin,vzin,tin
+c    $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
+c    $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
+c    $          ,dtimestep,int(restart_inflow))
 
       if (mod(istep,int(iostep_inflow)).eq.0) then
-        call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
-     $                       ,z_inflow)
+c        call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
+c     $                       ,z_inflow)
       endif
 c     ############################################################
 c     OUTPUT INITIAL CONDITION
@@ -493,16 +493,14 @@ c     ############################################################
       m=ny1*nz1*nely*nelz
 c
       if(icalled.eq.0) then
+        write(*,*)'pato5',nid
         call rzero(ravg,size(ravg))
         call gtpp_gs_setup(igs_x,nelx     ,nely,nelz,1) ! x-avx
         atime = 0.
         timel = time
         icalled = 1
-C         dtime = time - timel
-C         atime = atime + dtime
-c      elseif()!check when to read previous means
-
-      endif !(icalled.eq.0.and.restart_means.eq.0)
+      endif !(icalled.eq.0)
+      write(*,*)'pato6'
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -512,6 +510,7 @@ c     compute gradients
       call gradm1(vyx,vyy,vyz,vy)
       call gradm1(vzx,vzy,vzz,vz)
       call gradm1(tx,ty,tz,t(1,1,1,1,1))
+            write(*,*)'pato4'
 c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
@@ -589,11 +588,13 @@ C             call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
 C         enddo
 
         if(nid.eq.0) then
+	write(*,*)'pato1'
          write(istepc,'(i32)') istep
          istepc=adjustl(istepc)
          icfile=trim('means.'//trim(istepc))
          open(unit=58,file=icfile,form='unformatted')
          do i=1,nstat
+	 write(*,*)'pato2'
           call x_slice(w4,stat(1,i),w1,w2,w3)
 C           call copy(w3,stat2d(1,1,1,i),m) 
           write(58) w4
@@ -661,14 +662,14 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
 
       if (ifield .eq. 1) then               ! velocity
         if(ieg.le.nel_slab.and.iside.eq.5) then
-          ux  = vxin_pl(ix,iy,ieg)
-          uy  = vyin_pl(ix,iy,ieg)
-          uz  = vzin_pl(ix,iy,ieg)
+c          ux  = vxin_pl(ix,iy,ieg)
+c          uy  = vyin_pl(ix,iy,ieg)
+c          uz  = vzin_pl(ix,iy,ieg)
         endif
       elseif (ifield .eq. 2) then     !temperature
         temp = 0.0
         if (ieg.le.nel_slab.and.iside.eq.5) then  
-          temp  = tin_pl(ix,iy,ieg)
+c          temp  = tin_pl(ix,iy,ieg)
         endif
       endif
 c     ############################################################
@@ -691,15 +692,58 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
+C       subroutine usrdat
+C       include 'SIZE'
+C       include 'TOTAL'
+      
+C       integer n,nelyint,nelytot,mmnely
+C       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y
+
+C       n=8*nelt
+C c
+C       nelyint = 30
+C       nelytot = 44          !<------------ CHANGE! nely in big domain
+
+C       delyi =hf/nelyi
+C       rrleny = nelytot*delyi 
+C       rrlenyint = nelyint*delyi
+C       hfh=hf/2.0
+C       hfint = rrlenyint
+C       amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
+
+C       do i=1,n
+C         yc(i,1)  = rrleny * yc(i,1) 
+C         y=yc(i,1)
+
+C         if (y.le.hfh) then
+C           yc(i,1) = (-1)*(1-SINH(3.25*y)/SINH(3.25))+1
+C         elseif (y.le.hf) then
+C           yc(i,1) = (1)*(1 - SINH(3.25*(2-y))/SINH(3.25))+1
+C         elseif (y.le.hfint) then
+C           y = y / rrlenyint
+C           yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
+C         elseif (y.gt.hfint) then
+C           y = y/rrleny
+C           yc(i,1)=y*nelytot-24
+C         endif
+C         xc(i,1) =  XLEN * xc(i,1)
+C c        xc(i,1) =  2.0 * PI * xc(i,1)
+C         zc(i,1) = ZLEN * zc(i,1)
+C       enddo
+
+C       return
+C       end
       subroutine usrdat
       include 'SIZE'
       include 'TOTAL'
       
-      integer n,nelyint,nelytot,mmnely
-      real hfh,hfint,amp,delyi,rrleny,rrlenyint,y
+      integer n,nelyi,nelyint,nelytot,mmnely
+      real one,hf,hfh,hfint,amp,delyi,rrleny,rrlenyint,y
 
       n=8*nelt
 c
+      hf = 2.0             !<------------ CHANGE! Height of inflow domain
+      nelyi = 9            !<------------ CHANGE! nely of inflow domain
       nelyint = 30
       nelytot = 44          !<------------ CHANGE! nely in big domain
 
@@ -725,14 +769,13 @@ c
           y = y/rrleny
           yc(i,1)=y*nelytot-24
         endif
-        xc(i,1) =  XLEN * xc(i,1)
-c        xc(i,1) =  2.0 * PI * xc(i,1)
-        zc(i,1) = ZLEN * zc(i,1)
+        xc(i,1) =  (8.0/3.0)*pi * xc(i,1)
+c        xc(i,1) =  2.0 * pi * xc(i,1)
+        zc(i,1) = 32.0 * pi * zc(i,1)
       enddo
 
       return
       end
-
       subroutine usrdat2
       include 'SIZE'
       include 'TOTAL'
@@ -1113,7 +1156,7 @@ c      Read IC file
          if(k.eq.3) icfile=trim('vz_inflow.ini')
          if(k.eq.4) icfile=trim('temp_inflow.ini')
          write(*,*)'*****READING INFLOW FILE: ',icfile
-         open(unit=58,file=icfile,form='unformatted')
+         open(unit=58,file=icfile,status='old', ACCESS='stream')
          read(58) dum
          close(58)
        endif
