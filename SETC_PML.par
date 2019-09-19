@@ -1,0 +1,47 @@
+#
+# nek parameter file for Spatially Evolving TCs with PML
+#
+[GENERAL] 
+polynomialOrder = 7
+PnPnFormulation = yes
+minNumProcesses = 4
+
+startFrom = box0.f50001 time=0 
+stopAt = numSteps
+numSteps = 2000
+
+dt = 1.5e-4
+timeStepper = bdf3
+variableDt = no
+targetCFL = 1.0
+
+writeInterval = 1000
+
+userParam01 = 500      #output frequency for statistics
+userParam02 = 10       #viscosity multiplier at ouflow
+userParam03 = 200      #Ri_tau
+userParam04 = 0.08     #u_target for top PML, positive
+userParam05 = 0        #whether to read inflow2d.ini (2d) for restasting
+userParam06 = 20       #iostep_inflow
+userParam07 = 0.001    #integration filter limit 
+userParam08 = 0        #Restart of means flag (reads means.ini binary files)
+
+
+[PROBLEMTYPE]
+variableProperties = yes
+equation = incompNS
+
+[PRESSURE]
+#preconditioner = semg_amg
+residualTol = 1e-4 
+writeToFieldFile = no
+
+[VELOCITY]
+residualTol = 1e-6 
+density = 1.
+viscosity = -180
+
+[TEMPERATURE]
+rhoCp = 1.
+conductivity = -180
+residualTol = 1e-6 

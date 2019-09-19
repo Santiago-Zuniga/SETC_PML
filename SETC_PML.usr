@@ -4,7 +4,7 @@ c- constants -----------------------------------------------------------
 #define VISCFAC uparam(2)             /* viscosity multiplier at ouflow */
 #define RITAU uparam(3)               /* Ri_tau */
 #define UTARGET uparam(4)             /* u_target for top PML, positive */ 
-#define restart_inflow uparam(5)      /* wether to read inflow2d.ini (2d) for restasting */
+#define restart_inflow uparam(5)      /* whether to read inflow2d.ini (2d) for restasting */
 #define iostep_inflow uparam(6)       /* frequency of output for inflow2d file */
 #define delta_fltr uparam(7)          /* integration filter limit */
 #define restart_means uparam(8)       /* Restart of means flag (reads means.ini binary files) */
@@ -13,7 +13,7 @@ c- constants -----------------------------------------------------------
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
 #define ZLEN (32.*PI)
-#define XLEN 20.
+#define XLEN (8.*PI/3.)
 #define YLEN 20.
 #define ZBUFF (ZLEN-PI)
 #define YBUFF 12.
@@ -22,6 +22,8 @@ c - Iflow dimensions
 #define nelxin 15 /*number of elements of inflow array */
 #define nelyin 9
 #define nelzin 28
+#define hf 2.0 /*height of inflow domain*/
+
 
       subroutine uservp (ix,iy,iz,eg)
       include 'SIZE'
@@ -199,8 +201,6 @@ c     DEPTH-AVERAGED STATISTICS VARIABLES
 
 c     Output frequency of span-time-averaged .fld files
 c     and means.* binary files
-      integer iostep_2d_avg_time
-      parameter( iostep_2d_avg_time= 1000 ) !<-----------CHANGE!
 
 c     Output frequency of span-averaged .fld files
       integer iostep_2d
@@ -263,11 +263,16 @@ C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
       parameter(nstat=38)
       real ravg(lx1*ly1*lz1*lelt,nstat)
       real stat(lx1*ly1*lz1*lelt,nstat)
-      save ravg, stat
+      real stat2d(ly1,lz1,lely,lelz,nstat)
+      save ravg, stat, stat2d
       logical ifverbose
       common /gaaa/    wo1(lx1,ly1,lz1,lelv)
      &              ,  wo2(lx1,ly1,lz1,lelv)
      &              ,  wo3(lx1,ly1,lz1,lelv)
+
+      real             w1(ly1,lz1,lely,lelz)
+     $              ,   w2(ly1,lz1,lely,lelz)
+     &              ,  w3(ly1,lz1,lely,lelz)
 
       save igs_x
 
@@ -406,6 +411,8 @@ c     average in time variables
       data    icnt /0/
 c
       character*32 istepc,outfile
+
+      character*80 icfile
 c
 c     Gradient arrays for shear velocity, 
 c     tke production and dissipation computation
@@ -576,19 +583,437 @@ c     spanwise averaging
           call planar_avg(stat(1,i),ravg(1,i),igs_x) !x averaging
         enddo
 
-        if(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then   !if the last restart file was written during the current session, don't read it and keep on time averaging
-          call input_means(stat_old,time_old) !placeholder, fix this asap. time old should be the total time used for those means
-          t_new=time !assumes time_start=0
-          t_tot=t_new+t_old
-          alpha=t_new/t_tot
-          beta =t_old/t_tot
-          do i =1,nstat
-          call avg1(stat(1,i),stat_old(1,i),alpha,beta,n,'    ',.false.) !time averaging (n? shouldn't it be m?)
-          enddo
+        do i =1,nstat
+            call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
+        enddo
+
+        if(nid.eq.0) then
+         write(istepc,'(i32)') istep
+         istepc=adjustl(istepc)
+         icfile=trim('means.'//trim(istepc))
+         open(unit=58,file=icfile,form='unformatted')
+         do i=1,nstat
+          call copy(w3,stat2d(1,1,1,i),m) 
+          write(58) w3
+         enddo
+
+
+
+
+
+C         if(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then   !if the last restart file was written during the current session, don't read it and keep on time averaging
+C           call input_means(stat_old,time_old) !placeholder, fix this asap. time old should be the total time used for those means
+C           t_new=time !assumes time_start=0
+C           t_tot=t_new+t_old
+C           alpha=t_new/t_tot
+C           beta =t_old/t_tot
+C           do i =1,nstat
+C           call avg1(stat(1,i),stat_old(1,i),alpha,beta,n,'    ',.false.) !time averaging (n? shouldn't it be m?)
+C           enddo
+C         endif
+C         call write_means(stat) !placeholder, fix this asap
+
+
+c     ############################################################
+c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
+c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
+c
+      mn=ny1*nely
+      call rzero(tempbar,mn)
+      call planar_average_s(tempbar,t(1,1,1,1,1),w1t,w2t)
+c
+c     ############################################################
+
+
+      return
+      end
+
+c-----------------------------------------------------------------------
+      subroutine userbc (ix,iy,iz,iside,ieg)
+
+      include 'SIZE'
+      include 'TSTEP'
+      include 'PARALLEL'
+      include 'NEKUSE'
+
+c     ############################################################
+c     INFLOW FROM INTERPOLATED EXTERNAL FILE
+      parameter(nel_slab = nelxin*nelyin)
+
+      common /inflow_pl/ vxin_pl(lx1,ly1,nel_slab)
+     $                  ,vyin_pl(lx1,ly1,nel_slab)
+     $                  ,vzin_pl(lx1,ly1,nel_slab)
+     $                  ,tin_pl(lx1,ly1,nel_slab)
+
+c     ############################################################
+
+
+c     ############################################################
+c     ############################################################
+c     INFLOW FROM INTERPOLATED EXTERNAL FILE
+      ux   = 0.
+      uy   = 0.
+      uz   = 0.
+      temp = 0.
+
+      if (ifield .eq. 1) then               ! velocity
+        if(ieg.le.nel_slab.and.iside.eq.5) then
+          ux  = vxin_pl(ix,iy,ieg)
+          uy  = vyin_pl(ix,iy,ieg)
+          uz  = vzin_pl(ix,iy,ieg)
         endif
-        call write_means(stat) !placeholder, fix this asap
+      elseif (ifield .eq. 2) then     !temperature
+        temp = 0.0
+        if (ieg.le.nel_slab.and.iside.eq.5) then  
+          temp  = tin_pl(ix,iy,ieg)
+        endif
+      endif
+c     ############################################################
+c     ############################################################
 
-        
+      return
+      end
+
+      end
+c-----------------------------------------------------------------------
+      subroutine useric (ix,iy,iz,ieg)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+      ux = 0.0
+      uy = 0.0
+      uz = 0.0
+      temp = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat
+      include 'SIZE'
+      include 'TOTAL'
+      
+      integer n,nelyint,nelytot,mmnely
+      real hfh,hfint,amp,delyi,rrleny,rrlenyint,y
+
+      n=8*nelt
+c
+      nelyint = 30
+      nelytot = 44          !<------------ CHANGE! nely in big domain
+
+      delyi =hf/nelyi
+      rrleny = nelytot*delyi 
+      rrlenyint = nelyint*delyi
+      hfh=hf/2.0
+      hfint = rrlenyint
+      amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
+
+      do i=1,n
+        yc(i,1)  = rrleny * yc(i,1) 
+        y=yc(i,1)
+
+        if (y.le.hfh) then
+          yc(i,1) = (-1)*(1-SINH(3.25*y)/SINH(3.25))+1
+        elseif (y.le.hf) then
+          yc(i,1) = (1)*(1 - SINH(3.25*(2-y))/SINH(3.25))+1
+        elseif (y.le.hfint) then
+          y = y / rrlenyint
+          yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
+        elseif (y.gt.hfint) then
+          y = y/rrleny
+          yc(i,1)=y*nelytot-24
+        endif
+        xc(i,1) =  XLEN * xc(i,1)
+c        xc(i,1) =  2.0 * PI * xc(i,1)
+        zc(i,1) = ZLEN * zc(i,1)
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat3
+      include 'SIZE'
+      include 'TOTAL'
+c
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat2
+      include 'SIZE'
+      include 'TOTAL'
+c
+      return
+      end
 
 
 
+
+
+      subroutine x_slice (ua,u,w1,w2)
+c
+c     Extract a y slice of quantity u() - assumes global tens.prod.
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(ny1,nz1,nely,nelz),u (nx1,ny1,nz1,nelv)
+     $    ,w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
+      integer e,eg,ex,ey,ez
+      real dy2
+c
+      myz = nely*nelz*ny1*nz1
+      call rzero(ua,myz)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+
+         i = 1
+         if (ex.eq.1) then
+            do k=1,nz1
+            do j=1,ny1
+               ua(j,k,ey,ez) = u(i,j,k,e)
+            enddo
+            enddo
+         endif
+      enddo
+
+      call gop(ua,w2,'+  ',mxz)
+
+      return
+      end
+
+c     ##################################################################
+      subroutine planar_average_s(ua,u,w1,w2)
+c
+c     Compute r-t planar average of quantity u()
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(ny1,nely),u(nx1,ny1,nz1,nelt),w1(ny1,nely),w2(ny1,nely)
+      integer e,eg,ex,ey,ez
+c
+      ny = ny1*nely
+      call rzero(ua,ny)
+      call rzero(w1,ny)
+c
+      do e=1,nelt
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+c
+         do k=1,nz1
+         do j=1,ny1
+         do i=1,nx1
+            zz = (1.-zgm1(j,2))/2.  ! = 1 for i=1, = 0 for k=nx1
+            aa = zz*area(i,k,1,e) + (1-zz)*area(i,k,3,e)  ! wgtd jacobian
+            w1(j,ey) = w1(j,ey) + aa
+            ua(j,ey) = ua(j,ey) + aa*u(i,j,k,e)
+         enddo
+         enddo
+         enddo
+      enddo
+c
+      call gop(ua,w2,'+  ',ny)
+      call gop(w1,w2,'+  ',ny)
+c
+      do i=1,ny
+         ua(i,1) = ua(i,1) / w1(i,1)   ! Normalize
+      enddo
+
+      return
+      end
+
+c     ##############################################################
+
+c----------------------------------------------------------------
+      subroutine interpolate_inflow(vxin,vyin,vzin,tin
+     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
+     $           ,nelin,nel_slab,nelzin,z_inflow,rlenz
+     $          ,dtimestep,restart_inflow)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'
+
+      integer step_inflow,nelzin,nel_slab,nelin
+      integer restart_inflow
+      real rlenz,z_inflow,dz_inflow
+      real dtimestep
+
+      real vxin(lx1,ly1,lz1,nelin)
+     $    ,vyin(lx1,ly1,lz1,nelin)
+     $    ,vzin(lx1,ly1,lz1,nelin)
+     $    ,tin(lx1,ly1,lz1,nelin)
+
+      real vxin_pl(lx1,ly1,nel_slab)
+     $    ,vyin_pl(lx1,ly1,nel_slab)
+     $    ,vzin_pl(lx1,ly1,nel_slab)
+     $    ,tin_pl(lx1,ly1,nel_slab)
+
+
+
+      real zz(nz1,nelz),w1(nz1,nelz),w2(nz1,nelz)
+      real zzin(nz1,nelzin)
+      integer nzin,flagin,e,m
+
+      real vzinavg,uadum,w1in,z_sup,z_inf
+      integer k_sup,k_inf,ez_in,e_pl
+
+      real vxin_pl_dum(lx1,ly1,nel_slab)
+     $    ,vyin_pl_dum(lx1,ly1,nel_slab)
+     $    ,vzin_pl_dum(lx1,ly1,nel_slab)
+     $    ,tin_pl_dum(lx1,ly1,nel_slab)
+
+      real z_inflow_dum
+
+c     ---------------------------------------------------------
+      m = nx1*ny1*nel_slab
+      call planar_average_z(zz,zm1,w1,w2)
+      nzin=nelzin*nz1
+      call copy(zzin,zz,nzin)
+      if (istep.eq.0.and.restart_inflow.eq.0) then
+c        This part could be done only by nid.eq.0 
+c        but I'm tired of coding 
+         z_inflow = rlenz
+         do e=1,nel_slab
+          e_pl = nel_slab*(nelzin-1) + e
+          do j=1,ny1
+            do i=1,nx1
+              vxin_pl(i,j,e) = vxin(i,j,nz1,e_pl)
+              vyin_pl(i,j,e) = vyin(i,j,nz1,e_pl)
+              vzin_pl(i,j,e) = vzin(i,j,nz1,e_pl)
+              tin_pl(i,j,e) = tin(i,j,nz1,e_pl)
+            enddo
+          enddo
+         enddo
+
+      elseif (istep.eq.0.and.restart_inflow.eq.1) then
+c       This part has to be done by only nid.eq.0
+c       (could generate reading issues otherwise)
+        z_inflow = 0.0
+        z_inflow_dum = 0.0
+        call rzero(vxin_pl,m)
+        call rzero(vyin_pl,m)
+        call rzero(vzin_pl,m)
+        call rzero(tin_pl,m)
+        call rzero(vxin_pl_dum,m)
+        call rzero(vyin_pl_dum,m)
+        call rzero(vzin_pl_dum,m)
+        call rzero(tin_pl_dum,m)
+        if (nid.eq.0) then
+          write(*,*)'###### READING 2D INFLOW FILE FOR RESTART ####'
+          open(unit=58,file='inflow2d.ini',form='binary')
+          read(58) z_inflow_dum
+          read(58) vxin_pl_dum,vyin_pl_dum,vzin_pl_dum,tin_pl_dum
+          close(58)
+          write(*,*)'FILE: inflow2d.ini'
+          write(*,*)'###### READING 2D INFLOW FILE FOR RESTART DONE ###'
+        endif
+        call gop(z_inflow_dum,z_inflow,'+  ',1)
+        call gop(vxin_pl_dum,vxin_pl,'+  ',m)
+        call gop(vyin_pl_dum,vyin_pl,'+  ',m)
+        call gop(vzin_pl_dum,vzin_pl,'+  ',m)
+        call gop(tin_pl_dum,tin_pl,'+  ',m)
+
+      elseif (istep.gt.0) then
+c        This part could be done only by nid.eq.0 
+c        but I'm tired of coding 
+        call planar_average_z_inflow(vzinavg,vzin_pl,nel_slab,w1in)
+       
+        dz_inflow = dtimestep * vzinavg
+        if (z_inflow.lt.dz_inflow) then
+          z_inflow = rlenz - (dz_inflow - z_inflow)
+        else
+          z_inflow = z_inflow - dz_inflow
+        endif
+
+
+        flagin=0
+        do e=nelzin,1,-1
+          do k=nz1,1,-1
+            if (z_inflow.gt.zzin(k,e).and.flagin.eq.0) then
+              z_sup = zzin(k+1,e)
+              z_inf = zzin(k,e)
+              k_sup = k+1
+              k_inf = k
+              ez_in = e
+              flagin=1
+            endif
+          enddo
+        enddo
+
+        do e=1,nel_slab
+          e_pl = nel_slab*(ez_in-1) + e
+          do j=1,ny1
+            do i=1,nx1
+              vxin_pl(i,j,e)=((vxin(i,j,k_sup,e_pl)-
+     $                       vxin(i,j,k_inf,e_pl))/
+     $                       (z_sup-z_inf))*
+     $                       (z_inflow - z_inf) +
+     $                       vxin(i,j,k_inf,e_pl)
+
+              vyin_pl(i,j,e)=((vyin(i,j,k_sup,e_pl)-
+     $                       vyin(i,j,k_inf,e_pl))/
+     $                       (z_sup-z_inf))*
+     $                       (z_inflow - z_inf) +
+     $                       vyin(i,j,k_inf,e_pl)
+
+              vzin_pl(i,j,e)=((vzin(i,j,k_sup,e_pl)-
+     $                       vzin(i,j,k_inf,e_pl))/
+     $                       (z_sup-z_inf))*
+     $                       (z_inflow - z_inf) +
+     $                       vzin(i,j,k_inf,e_pl)
+
+              tin_pl(i,j,e) =((tin(i,j,k_sup,e_pl)-
+     $                       tin(i,j,k_inf,e_pl))/
+     $                       (z_sup-z_inf))*
+     $                       (z_inflow - z_inf) +
+     $                       tin(i,j,k_inf,e_pl)
+            enddo
+          enddo
+        enddo
+
+      endif
+
+      return
+      end
+
+
+c     ############################################################
+      subroutine output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl
+     $                           ,nel_slab,z_inflow)
+c
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'
+
+      real z_inflow
+      integer nel_slab
+
+      real vxin_pl(lx1,ly1,nel_slab)
+     $    ,vyin_pl(lx1,ly1,nel_slab)
+     $    ,vzin_pl(lx1,ly1,nel_slab)
+     $    ,tin_pl(lx1,ly1,nel_slab)
+
+      character*80 istepc_inflow,icfile_inflow
+c    ----------------------------------------------------------
+
+      if (nid.eq.0) then
+        write(istepc_inflow,'(i32)') istep
+        istepc_inflow=adjustl(istepc_inflow)
+        icfile_inflow=trim('inflow2d'//'.'//trim(istepc_inflow))
+        open(unit=58,file=icfile_inflow,form='binary')
+        write(58) z_inflow
+        write(58) vxin_pl,vyin_pl,vzin_pl,tin_pl
+        close(58)
+      endif
+
+      return
+      end

@@ -1,0 +1,13 @@
+base.rea
+-3                         spatial dimension (if negative dump .re2 file)
+2                         number of fields
+#
+#=======================================================================
+#
+box_1
+-15 -44 -112                    nelx,nely,nelz (negative --> auto spacing)
+0.0 1.0 1.0                  x_0  x_1 ratio
+0.0 1.0 1.0		     y_0  y_1 ratio
+0.0 1.0 1.0                  z_0  z_1 ratio
+P  ,P  ,W  ,O  ,v  ,O  ,     bc's  ! west,east,south,north,bottom,top
+P  ,P  ,I  ,I  ,t  ,O  ,     bc's  ! west,east,south,north,bottom,top
