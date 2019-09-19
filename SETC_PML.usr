@@ -32,14 +32,15 @@ c - Iflow dimensions
 
 c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
-c
+       
       zout = ZLEN-PI                               !<----------CHANGE!
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
          udiff = param(2)
-         if (z.ge.zout) then
-           udiff =((param(2)*VISCFAC - param(2))/(ZLEN-zout))
-     $            *(z-zout) + param(2)
+         if (z.ge.zout)then
+               udiff =((param(2)*VISCFAC-param(2))/(ZLEN-zout))
+c               udiff = udiff * (z-zout) + param(2)
+C       $            *(z-zout) + param(2)
          endif
       else if(ifield.eq.2)then                    ! temperature eqn
         utrans= param(7)
@@ -722,7 +723,7 @@ c
           y = y/rrleny
           yc(i,1)=y*nelytot-24
         endif
-        xc(i,1) =  XLEN * xc(i,1)
+        xc(i,1) =   * xc(i,1)
 c        xc(i,1) =  2.0 * PI * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
       enddo
