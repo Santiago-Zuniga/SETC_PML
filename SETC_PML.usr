@@ -747,95 +747,9 @@ c-----------------------------------------------------------------------
 c
       return
       end
+
 c-----------------------------------------------------------------------
-
-      subroutine x_slice (ua,u,w1,w2,w3)
-c
-c     Extract a y slice of quantity u() - assumes global tens.prod.
-c
-      include 'SIZE'
-      include 'GEOM'
-      include 'PARALLEL'
-      include 'WZ'
-      include 'ZPER'
-c
-      real ua(ny1,nz1,nely,nelz),u(nx1*ny1*nz1*nelv)
-     $    ,w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
-     $     ,w3(ny1,nz1,nely,nelz)
-      integer e,eg,ex,ey,ez
-      real dy2
-c
-      myz = nely*nelz*ny1*nz1
-      call copy(w3,u,nx1*ny1*nz1*nelv)
-      call rzero(ua,myz)
-c
-      do e=1,nelt
-c
-         eg = lglel(e)
-         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-
-         i = 1
-         if (ex.eq.1) then
-            do k=1,nz1
-            do j=1,ny1
-               ua(j,k,ey,ez) = w3(i,j,k,e)
-            enddo
-            enddo
-         endif
-      enddo
-
-      call gop(ua,w2,'+  ',myz)
-
-      return
-      end
-
-c     ##################################################################
-      subroutine planar_average_s(ua,u,w1,w2)
-c
-c     Compute r-t planar average of quantity u()
-c
-      include 'SIZE'
-      include 'GEOM'
-      include 'PARALLEL'
-      include 'WZ'
-      include 'ZPER'
-c
-      real ua(ny1,nely),u(nx1,ny1,nz1,nelt),w1(ny1,nely),w2(ny1,nely)
-      integer e,eg,ex,ey,ez
-c
-      ny = ny1*nely
-      call rzero(ua,ny)
-      call rzero(w1,ny)
-c
-      do e=1,nelt
-         eg = lglel(e)
-         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-c
-         do k=1,nz1
-         do j=1,ny1
-         do i=1,nx1
-            zz = (1.-zgm1(j,2))/2.  ! = 1 for i=1, = 0 for k=nx1
-            aa = zz*area(i,k,1,e) + (1-zz)*area(i,k,3,e)  ! wgtd jacobian
-            w1(j,ey) = w1(j,ey) + aa
-            ua(j,ey) = ua(j,ey) + aa*u(i,j,k,e)
-         enddo
-         enddo
-         enddo
-      enddo
-c
-      call gop(ua,w2,'+  ',ny)
-      call gop(w1,w2,'+  ',ny)
-c
-      do i=1,ny
-         ua(i,1) = ua(i,1) / w1(i,1)   ! Normalize
-      enddo
-
-      return
-      end
-
-c     ##############################################################
-c-----------------------------------------------------------------------
-      subroutine planar_average_z_inflow(ua,u,mnelin,w1)
+      subroutine planar_inflow(ua,u,mnelin,w1)
 c
 c     Compute r-s planar average of quantity u()
 c
@@ -985,7 +899,7 @@ c       (could generate reading issues otherwise)
       elseif (istep.gt.0) then
 c        This part could be done only by nid.eq.0 
 c        but I'm tired of coding 
-        call planar_average_z_inflow(vzinavg,vzin_pl,nel_slab,w1in)
+        call planar_inflow(vzinavg,vzin_pl,nel_slab,w1in)
        
         dz_inflow = dtimestep * vzinavg
         if (z_inflow.lt.dz_inflow) then
@@ -1045,6 +959,94 @@ c        but I'm tired of coding
       return
       end
 
+c-----------------------------------------------------------------------
+
+      subroutine x_slice (ua,u,w1,w2,w3)
+c
+c     Extract a y slice of quantity u() - assumes global tens.prod.
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(ny1,nz1,nely,nelz),u(nx1*ny1*nz1*nelv)
+     $    ,w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
+     $     ,w3(ny1,nz1,nely,nelz)
+      integer e,eg,ex,ey,ez
+      real dy2
+c
+      myz = nely*nelz*ny1*nz1
+      call copy(w3,u,nx1*ny1*nz1*nelv)
+      call rzero(ua,myz)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+
+         i = 1
+         if (ex.eq.1) then
+            do k=1,nz1
+            do j=1,ny1
+               ua(j,k,ey,ez) = w3(i,j,k,e)
+            enddo
+            enddo
+         endif
+      enddo
+
+      call gop(ua,w2,'+  ',myz)
+
+      return
+      end
+
+c     ##################################################################
+      subroutine planar_average_s(ua,u,w1,w2)
+c
+c     Compute r-t planar average of quantity u()
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(ny1,nely),u(nx1,ny1,nz1,nelt),w1(ny1,nely),w2(ny1,nely)
+      integer e,eg,ex,ey,ez
+c
+      ny = ny1*nely
+      call rzero(ua,ny)
+      call rzero(w1,ny)
+c
+      do e=1,nelt
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+c
+         do k=1,nz1
+         do j=1,ny1
+         do i=1,nx1
+            zz = (1.-zgm1(j,2))/2.  ! = 1 for i=1, = 0 for k=nx1
+            aa = zz*area(i,k,1,e) + (1-zz)*area(i,k,3,e)  ! wgtd jacobian
+            w1(j,ey) = w1(j,ey) + aa
+            ua(j,ey) = ua(j,ey) + aa*u(i,j,k,e)
+         enddo
+         enddo
+         enddo
+      enddo
+c
+      call gop(ua,w2,'+  ',ny)
+      call gop(w1,w2,'+  ',ny)
+c
+      do i=1,ny
+         ua(i,1) = ua(i,1) / w1(i,1)   ! Normalize
+      enddo
+
+      return
+      end
+
+c     ##############################################################
+
 
 c     ############################################################
       subroutine output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl
@@ -1075,5 +1077,97 @@ c    ----------------------------------------------------------
         close(58)
       endif
 
+      return
+      end
+c----------------------------------------------------------------------
+
+      subroutine read_inflow(vxin,vyin,vzin,tin,nelin,nin)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'
+
+      integer nelin,nin
+
+      real vxin(lx1,ly1,lz1,nelin)
+     $    ,vyin(lx1,ly1,lz1,nelin)
+     $    ,vzin(lx1,ly1,lz1,nelin)
+     $    ,tin(lx1,ly1,lz1,nelin)
+
+
+      real dum(nx1,ny1,nz1,nelin)
+      character*80 icfile
+c     -----------------------------------------------------
+
+      call rzero(vxin,nin)
+      call rzero(vyin,nin)
+      call rzero(vzin,nin)
+      call rzero(tin,nin)
+      do k=1,4 !only works with 3d TC
+c      Zero all dummy arrays
+       call rzero(dum,nin)
+c      Read IC file
+       if (nid.eq.0) then
+         if(k.eq.1) icfile=trim('vx_inflow.ini')
+         if(k.eq.2) icfile=trim('vy_inflow.ini')
+         if(k.eq.3) icfile=trim('vz_inflow.ini')
+         if(k.eq.4) icfile=trim('temp_inflow.ini')
+         write(*,*)'*****READING INFLOW FILE: ',icfile
+         open(unit=58,file=icfile,form='unformatted')
+         read(58) dum
+         close(58)
+       endif
+c      Add across all processors (dum --> vxin)
+       if(k.eq.1) call gop(dum,vxin,'+  ',nin)
+       if(k.eq.2) call gop(dum,vyin,'+  ',nin)
+       if(k.eq.3) call gop(dum,vzin,'+  ',nin)
+       if(k.eq.4) call gop(dum,tin,'+  ',nin)
+      enddo
+
+      return
+      end
+
+c-----------------------------------------------------------------------
+      subroutine planar_average_z(ua,u,w1,w2)
+c
+c     Compute r-s planar average of quantity u()
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(nz1,nelz),u(nx1*ny1,nz1,nelv),w1(nz1,nelz),w2(nz1,nelz)
+      integer e,eg,ez
+c
+      melxy = nelx*nely
+c
+      nz = nz1*nelz
+      call rzero(ua,nz)
+      call rzero(w1,nz)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         ez = 1 + (eg-1)/melxy
+c
+         do k=1,nz1
+         do i=1,nx1*ny1
+            zz = (1.-zgm1(k,3))/2.  ! = 1 for k=1, = 0 for k=nz1
+            aa = zz*area(i,1,5,e) + (1-zz)*area(i,1,6,e)  ! wgtd jacobian
+            w1(k,ez) = w1(k,ez) + aa
+            ua(k,ez) = ua(k,ez) + aa*u(i,k,e)
+         enddo
+         enddo
+      enddo
+c
+      call gop(ua,w2,'+  ',nz)
+      call gop(w1,w2,'+  ',nz)
+c
+      do i=1,nz
+         ua(i,1) = ua(i,1) / w1(i,1)   ! Normalize
+      enddo
+c
       return
       end
