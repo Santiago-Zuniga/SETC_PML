@@ -274,6 +274,7 @@ C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
       real             w1(ly1,lz1,lely,lelz)
      $              ,   w2(ly1,lz1,lely,lelz)
      &              ,  w3(ly1,lz1,lely,lelz)
+     &              ,  w4(ly1,lz1,lely,lelz)
 
       save igs_x
 
@@ -470,7 +471,7 @@ c     READ INFLOW
         endif
       endif
 
-      call interpolate_inflow(vxin,vyin,vzin,tin
+      call interpolateinflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
      $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
      $          ,dtimestep,int(restart_inflow))
@@ -583,9 +584,9 @@ c     spanwise averaging
           call planar_avg(stat(1,i),ravg(1,i),igs_x) !x averaging
         enddo
 
-        do i =1,nstat
-            call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
-        enddo
+C         do i =1,nstat
+C             call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
+C         enddo
 
         if(nid.eq.0) then
          write(istepc,'(i32)') istep
@@ -593,8 +594,9 @@ c     spanwise averaging
          icfile=trim('means.'//trim(istepc))
          open(unit=58,file=icfile,form='unformatted')
          do i=1,nstat
-          call copy(w3,stat2d(1,1,1,i),m) 
-          write(58) w3
+          call x_slice(w4,stat(1,i),w1,w2,w3)
+C           call copy(w3,stat2d(1,1,1,i),m) 
+          write(58) w4
          enddo
         endif
 
@@ -730,6 +732,14 @@ c        xc(i,1) =  2.0 * PI * xc(i,1)
 
       return
       end
+
+      subroutine usrdat2
+      include 'SIZE'
+      include 'TOTAL'
+c
+      return
+      end
+      
 c-----------------------------------------------------------------------
       subroutine usrdat3
       include 'SIZE'
@@ -738,18 +748,8 @@ c
       return
       end
 c-----------------------------------------------------------------------
-      subroutine usrdat2
-      include 'SIZE'
-      include 'TOTAL'
-c
-      return
-      end
 
-
-
-
-
-      subroutine x_slice (ua,u,w1,w2)
+      subroutine x_slice (ua,u,w1,w2,w3)
 c
 c     Extract a y slice of quantity u() - assumes global tens.prod.
 c
@@ -759,12 +759,14 @@ c
       include 'WZ'
       include 'ZPER'
 c
-      real ua(ny1,nz1,nely,nelz),u (nx1,ny1,nz1,nelv)
+      real ua(ny1,nz1,nely,nelz),u(nx1*ny1*nz1*nelv)
      $    ,w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
+     $     ,w3(ny1,nz1,nely,nelz)
       integer e,eg,ex,ey,ez
       real dy2
 c
       myz = nely*nelz*ny1*nz1
+      call copy(w3,u,nx1*ny1*nz1*nelv)
       call rzero(ua,myz)
 c
       do e=1,nelt
@@ -776,13 +778,13 @@ c
          if (ex.eq.1) then
             do k=1,nz1
             do j=1,ny1
-               ua(j,k,ey,ez) = u(i,j,k,e)
+               ua(j,k,ey,ez) = w3(i,j,k,e)
             enddo
             enddo
          endif
       enddo
 
-      call gop(ua,w2,'+  ',mxz)
+      call gop(ua,w2,'+  ',myz)
 
       return
       end
@@ -832,9 +834,66 @@ c
       end
 
 c     ##############################################################
+c-----------------------------------------------------------------------
+      subroutine planar_average_z_inflow(ua,u,mnelin,w1)
+c
+c     Compute r-s planar average of quantity u()
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      integer e,eg,mnelin,nxyin
+      real u(nx1*ny1,mnelin),aindum(nx1*ny1,mnelin)
+      real ain(nx1*ny1,mnelin),ua,uadum,w1,w1dum
+c
+c     As the numbering of elements in a single box
+c     go in the order of r-s-t (first fill r, then 
+c     s and then t) the ordering of the 2d elements 
+c     in u (2d inlet) is the same as the first 
+c     t-plane of elements in the 3d box. Hence,
+c     face 5 of the first mnelin elements of the 
+c     3dbox have the same area as the 2d inlet.
+
+      nxyin = nx1*ny1*mnelin
+      call rzero(ain,nxyin)
+      call rzero(aindum,nxyin)
+      do e=1,nelt
+c        l local gl global el element
+         eg = lglel(e)
+         if (eg.le.mnelin) then
+           do i=1,nx1*ny1
+              aindum(i,eg) = area(i,1,5,e)
+           enddo
+         endif
+      enddo
+      call gop(aindum,ain,'+  ',nxyin)
+
+      ua=0.0
+      uadum=0.0
+      w1=0.0
+      w1dum=0.0
+
+      if (nid.eq.0) then
+       do e=1,mnelin
+          do i=1,nx1*ny1
+            w1dum = w1dum + ain(i,e)
+            uadum = uadum + ain(i,e)*u(i,e)
+          enddo
+       enddo
+       uadum = uadum / w1dum ! Normalize
+      endif
+      call gop(uadum,ua,'+  ',1)      
+      call gop(w1dum,w1,'+  ',1)      
+
+
+      return
+      end
 
 c----------------------------------------------------------------
-      subroutine interpolate_inflow(vxin,vyin,vzin,tin
+      subroutine interpolateinflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
      $           ,nelin,nel_slab,nelzin1,z_inflow,rlenz
      $          ,dtimestep,restart_inflow1)
