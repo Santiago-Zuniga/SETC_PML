@@ -233,10 +233,15 @@ c     spanwise-averaged arrays
       real suvm(lx1,ly1,lz1,lelt,6)
       real suxm(lx1,ly1,lz1,lelt,12)
       real sux2(lx1,ly1,lz1,lelt,12)
-c      real stat(lx1*ly1*lz1*lelt,nstat)
-c      real stat2d(ly1,lz1,lely,lelz,nstat)
+      real summ_2d(ly1,lz1,lely,lelz,4)
+      real su2m_2d(ly1,lz1,lely,lelz,4)
+      real suvm_2d(ly1,lz1,lely,lelz,6)
+      real suxm_2d(ly1,lz1,lely,lelz,12)
+      real sux2_2d(ly1,lz1,lely,lelz,12)
 c      save ravg, stat, stat2d
-      save rumm,rux2,ruvm,ruxm,rux2,summ,sux2,suvm,suxm,sux2
+      save rumm,rux2,ruvm,ruxm,rux2,summ,sux2,suvm,suxm,sux2,
+     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d
+
       logical ifverbose
       common /gaaa/    wo1(lx1,ly1,lz1,lelv)
      &              ,  wo2(lx1,ly1,lz1,lelv)
@@ -476,14 +481,19 @@ c     ############################################################
 c     spanwise averaging
         do i =1,12
           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
+          call x_slice(suxm_2d(1,1,1,1,i),suxm(1,1,1,1,i),w1,w2)
           call planar_avg(sux2(1,1,1,1,i),rux2(1,1,1,1,i),igs_x) !x averaging
+          call x_slice(sux2_2d(1,1,1,1,i),sux2(1,1,1,1,i),w1,w2)
         enddo
         do i =1,6
           call planar_avg(suvm(1,1,1,1,i),ruvm(1,1,1,1,i),igs_x) !x averaging
+          call x_slice(suvm_2d(1,1,1,1,i),suvm(1,1,1,1,i),w1,w2)
         enddo
         do i =1,4
           call planar_avg(summ(1,1,1,1,i),rumm(1,1,1,1,i),igs_x) !x averaging
+          call x_slice(summ_2d(1,1,1,1,i),summ(1,1,1,1,i),w1,w2)
           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
+          call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
         enddo
 
         if(nid.eq.0) then
@@ -492,40 +502,39 @@ c     spanwise averaging
          icfile=trim('means.'//trim(istepc))
          open(unit=58,file=icfile,form='unformatted')
          do i=1,4
-           call copy(wo1,summ(1,1,1,1,i),n)
-           call x_slice(w4,wo1,w1,w2)
+           call copy(w4,summ_2d(1,1,1,1,i),m)
            write(58) w4
          enddo
          do i=1,4
-           call x_slice(w4,su2m(1,1,1,1,i),w1,w2)
+           call copy(w4,su2m_2d(1,1,1,1,i),m)
            write(58) w4
          enddo
          do i=1,6
-           call x_slice(w4,suvm(1,1,1,1,i),w1,w2)
+           call copy(w4,suvm_2d(1,1,1,1,i),m)
            write(58) w4
          enddo
          do i=1,12
-           call x_slice(w4,suxm(1,1,1,1,i),w1,w2)
+           call copy(w4,suxm_2d(1,1,1,1,i),m)
            write(58) w4
          enddo
          do i=1,12
-           call x_slice(w4,suxm(1,1,1,1,i),w1,w2)
+           call copy(w4,sux2_2d(1,1,1,1,i),m)
            write(58) w4
          enddo
          close(58)
         endif
       
 
-        if (nid.eq.0)then
-          open(unit=12,file='test2du.dat')
-          call x_slice(w4,summ(1,1,1,1,i),w1,w2) !w4(ly1,lz1,lely,lelz)
-          do i=1,nely
-            do j=1,nelz
-              write(12,*)(w4(k,1,i,j), k=1,ny1*nz1)
-            enddo
-          enddo
-          close(12)
-        endif 
+C         if (nid.eq.0)then   !!quick test for debbuging
+C           open(unit=12,file='test2du.dat')
+C           call copy(w4,summ_2d(1,1,1,1,i),m)
+C           do i=1,nely
+C             do j=1,nelz
+C               write(12,*)(w4(k,1,i,j), k=1,ny1*nz1)
+C             enddo
+C           enddo
+C           close(12)
+C         endif 
 
       endif
 
@@ -588,14 +597,14 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
 
       if (ifield .eq. 1) then               ! velocity
         if(ieg.le.nel_slab.and.iside.eq.5) then
-c          ux  = vxin_pl(ix,iy,ieg)
-c          uy  = vyin_pl(ix,iy,ieg)
-c          uz  = vzin_pl(ix,iy,ieg)
+          ux  = vxin_pl(ix,iy,ieg)
+          uy  = vyin_pl(ix,iy,ieg)
+          uz  = vzin_pl(ix,iy,ieg)
         endif
       elseif (ifield .eq. 2) then     !temperature
         temp = 0.0
         if (ieg.le.nel_slab.and.iside.eq.5) then  
-c          temp  = tin_pl(ix,iy,ieg)
+          temp  = tin_pl(ix,iy,ieg)
         endif
       endif
 c     ############################################################
@@ -1003,53 +1012,6 @@ c
 
       return
       end
-
-c     ##################################################################
-      subroutine planar_average_s(ua,u,w1,w2)
-c
-c     Compute r-t planar average of quantity u()
-c
-      include 'SIZE'
-      include 'GEOM'
-      include 'PARALLEL'
-      include 'WZ'
-      include 'ZPER'
-c
-      real ua(ny1,nely),u(nx1,ny1,nz1,nelt),w1(ny1,nely),w2(ny1,nely)
-      integer e,eg,ex,ey,ez
-c     
-      ny = ny1*nely
-      call rzero(ua,ny)
-      call rzero(w1,ny)
-c
-      do e=1,nelt
-         eg = lglel(e)
-         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-c    
-         do k=1,nz1
-         do j=1,ny1
-         do i=1,nx1
-            zz = (1.-zgm1(j,2))/2.  ! = 1 for i=1, = 0 for k=nx1
-            aa = zz*area(i,k,1,e) + (1-zz)*area(i,k,3,e)  ! wgtd jacobian
-            w1(j,ey) = w1(j,ey) + aa
-            ua(j,ey) = ua(j,ey) + aa*u(i,j,k,e)
-         enddo
-         enddo
-         enddo
-      enddo
-c
-      call gop(ua,w2,'+  ',ny)
-      call gop(w1,w2,'+  ',ny)
-c
-      do i=1,ny
-         ua(i,1) = ua(i,1) / w1(i,1)   ! Normalize
-      enddo
-
-      return
-      end
-
-c     ##############################################################
-
 
 c     ############################################################
       subroutine output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl
