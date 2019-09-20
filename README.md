@@ -1,7 +1,7 @@
 # SETC_PML
 Spatially evolving turbidity current with perfectly matched layers, for NEK5000 v19
+Beware that despite the new planar_avg routine is being used, the slices still assumes a box-type mesh
 TODO
-~~~There is an issue with the memory needed to make the 3d time averages. In MecClust, at least 5 nodes are needed for the 73920 elements grid.~~~Fixed, lelt was wrong.
 + Write i/o routines
 + Write perturbation routines
 + Write spanwise averaging (no time) routines
