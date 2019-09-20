@@ -222,48 +222,6 @@ c     spanwise-averaged arrays
       real    yavgx(ny1,nz1,lely,lelz)
      $    ,   zavgx(ny1,nz1,lely,lelz)
 
-c     spanwise-averaged arrays
-C       common /avg2dtime/ 
-C      $        uavgx(ly1,lz1,lely,lelz)
-C      $    ,   vavgx(ly1,lz1,lely,lelz)
-C      $    ,   wavgx(ly1,lz1,lely,lelz)
-C      $    ,   tavgx(ly1,lz1,lely,lelz)
-C      $    ,   w1(ly1,lz1,lely,lelz)
-C      $    ,   w2(ly1,lz1,lely,lelz)
-C      $    ,   u2avgx(ly1,lz1,lely,lelz)
-C      $    ,   v2avgx(ly1,lz1,lely,lelz)
-C      $    ,   w2avgx(ly1,lz1,lely,lelz)
-C      $    ,   t2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uvavgx(ly1,lz1,lely,lelz)
-C      $    ,   uwavgx(ly1,lz1,lely,lelz)
-C      $    ,   utavgx(ly1,lz1,lely,lelz)
-C      $    ,   vwavgx(ly1,lz1,lely,lelz)
-C      $    ,   vtavgx(ly1,lz1,lely,lelz)
-C      $    ,   wtavgx(ly1,lz1,lely,lelz)
-C      $    ,   uxavgx(ly1,lz1,lely,lelz)
-C      $    ,   uyavgx(ly1,lz1,lely,lelz)
-C      $    ,   uzavgx(ly1,lz1,lely,lelz)
-C      $    ,   vxavgx(ly1,lz1,lely,lelz)
-C      $    ,   vyavgx(ly1,lz1,lely,lelz)
-C      $    ,   vzavgx(ly1,lz1,lely,lelz)
-C      $    ,   wxavgx(ly1,lz1,lely,lelz)
-C      $    ,   wyavgx(ly1,lz1,lely,lelz)
-C      $    ,   wzavgx(ly1,lz1,lely,lelz)
-C      $    ,   txavgx(ly1,lz1,lely,lelz)
-C      $    ,   tyavgx(ly1,lz1,lely,lelz)
-C      $    ,   tzavgx(ly1,lz1,lely,lelz)
-C      $    ,   ux2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uy2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uz2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vx2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vy2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vz2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wx2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wy2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wz2avgx(ly1,lz1,lely,lelz)
-C      $    ,   tx2avgx(ly1,lz1,lely,lelz)
-C      $    ,   ty2avgx(ly1,lz1,lely,lelz)
-C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
       parameter(nstat=38)
       real rumm(lx1*ly1*lz1*lelt,4)
       real ru2m(lx1*ly1*lz1*lelt,4)
@@ -289,89 +247,7 @@ c      save ravg, stat, stat2d
      &              ,  w3(ly1,lz1,lely,lelz)
      &              ,  w4(ly1,lz1,lely,lelz)
 
-      save igs_x
-
-c     perturbations
-C       real    up2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   tp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uvpavgx(ly1,lz1,lely,lelz)
-C      $    ,   uwpavgx(ly1,lz1,lely,lelz)
-C      $    ,   utpavgx(ly1,lz1,lely,lelz)
-C      $    ,   vwpavgx(ly1,lz1,lely,lelz)
-C      $    ,   vtpavgx(ly1,lz1,lely,lelz)
-C      $    ,   wtpavgx(ly1,lz1,lely,lelz)
-C      $    ,   uxp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uyp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   uzp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vxp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vyp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   vzp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wxp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wyp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   wzp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   txp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   typ2avgx(ly1,lz1,lely,lelz)
-C      $    ,   tzp2avgx(ly1,lz1,lely,lelz)
-C      $    ,   kavgx(ly1,lz1,lely,lelz)
-C      $    ,   prodavgx(ly1,lz1,lely,lelz)
-C      $    ,   dissavgx(ly1,lz1,lely,lelz)
-C      $    ,   rigavgx(ly1,lz1,lely,lelz)
-C      $    ,   urmsavgx(ly1,lz1,lely,lelz)
-C      $    ,   vrmsavgx(ly1,lz1,lely,lelz)
-C      $    ,   wrmsavgx(ly1,lz1,lely,lelz)
-C      $    ,   trmsavgx(ly1,lz1,lely,lelz)
-
-C c     spanwise-averaged arrays for shape functions
-C       real    eta_fltr(ny1,nz1,lely,lelz)
-C      $    ,   wavgx_w_fltr(ny1,nz1,lely,lelz)
-C      $    ,   tavgx_t_fltr(ny1,nz1,lely,lelz)
-C      $    ,   kavgx_k_fltr(ny1,nz1,lely,lelz)
-C      $    ,   vwpavgx_w2_fltr(ny1,nz1,lely,lelz)
-C      $    ,   vtpavgx_wt_fltr(ny1,nz1,lely,lelz)
-C      $    ,   prodavgx_hw3_fltr(ny1,nz1,lely,lelz)
-C      $    ,   dissavgx_hw3_fltr(ny1,nz1,lely,lelz)
-C c
-C c     spanwise-averaged arrays (non-time averaged)
-C       real    uavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   tavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   u2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   v2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   w2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   t2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uvavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uwavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   utavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vwavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vtavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wtavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uxavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uyavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uzavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vxavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vyavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vzavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wxavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wyavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wzavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   txavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   tyavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   tzavgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   ux2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uy2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   uz2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vx2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vy2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   vz2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wx2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wy2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   wz2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   tx2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   ty2avgx_notime(ly1,lz1,lely,lelz)
-C      $    ,   tz2avgx_notime(ly1,lz1,lely,lelz)
+      save igs_x, igs_z
 
 c     depth-averaged arrays
       real zavgxy(nz1,lelz)
@@ -476,18 +352,18 @@ c     streamwise velocity and concentration
 
       dtimestep = abs(PARAM(12))
 c     READ INFLOW
-C       if (istep.eq.0) then
-C         call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
-C         if (set_IC_flag.eq.1) then
-C           call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
-C      $               ,nel_slab)
-C         endif
-C       endif
+      if (istep.eq.0) then
+        call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
+        if (set_IC_flag.eq.1) then
+          call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
+     $               ,nel_slab)
+        endif
+      endif
 
-C      call interpolateinflow(vxin,vyin,vzin,tin
-C     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-C     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-C     $          ,dtimestep,int(restart_inflow))
+      call interpolateinflow(vxin,vyin,vzin,tin
+     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
+     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
+     $          ,dtimestep,int(restart_inflow))
 
       if (mod(istep,int(iostep_inflow)).eq.0) then
 c        call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
@@ -514,7 +390,8 @@ c
         call rzero(ruvm,size(ruvm))
         call rzero(ruxm,size(ruxm))
         call rzero(rux2,size(rux2))
-        call gtpp_gs_setup(igs_x,nelx,nely,nelz,1) ! x-avx
+        call gtpp_gs_setup(igs_x,nelx,nely,  nelz,1) ! x-avx
+        call gtpp_gs_setup(igs_z,nelx*nely,1,nelz,3) ! z-avx
         atime = 0.
         timel = time
         icalled = 1
@@ -528,7 +405,6 @@ c     compute gradients
       call gradm1(vyx,vyy,vyz,vy)
       call gradm1(vzx,vzy,vzz,vz)
       call gradm1(tx,ty,tz,t(1,1,1,1,1))
-      write(*,*)'pato4'
 c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
@@ -541,21 +417,19 @@ c       Compute time-average of u,v,w and t
         call avg1(rumm(1,2),vy,alpha,beta,n,'vavg',ifverbose) 
         call avg1(rumm(1,3),vz,alpha,beta,n,'wavg',ifverbose) 
         call avg1(rumm(1,4),t, alpha,beta,n,'tavg',ifverbose)
-        write(*,*)'pato5'
 
 c       Compute time-average of u^2,v^2,w^2 and t^2     
         call avg2(ru2m(1,1),vx,alpha,beta,n,'u2mm',ifverbose)
         call avg2(ru2m(1,2),vy,alpha,beta,n,'v2mm',ifverbose) 
         call avg2(ru2m(1,3),vz,alpha,beta,n,'w2mm',ifverbose) 
         call avg2(ru2m(1,4),t ,alpha,beta,n,'t2mm',ifverbose)
-        write(*,*)'pato6'
 
 c       Compute time-average of cross products
         call avg3(ruvm(1,1),vx,vy,alpha,beta,n,'uvmm',ifverbose)
         call avg3(ruvm(1,2),vx,vz,alpha,beta,n,'uwmm',ifverbose)
         call avg3(ruvm(1,3),vx, t,alpha,beta,n,'utmm',ifverbose)
         call avg3(ruvm(1,4),vy,vz,alpha,beta,n,'vwmm',ifverbose)
-        call avg3(ruvm(1,5),vt, t,alpha,beta,n,'vtmm',ifverbose)
+        call avg3(ruvm(1,5),vy, t,alpha,beta,n,'vtmm',ifverbose)
         call avg3(ruvm(1,6),vz, t,alpha,beta,n,'wtmm',ifverbose)
         write(*,*)'pato7'
 
@@ -592,7 +466,6 @@ c       Compute time-average of squared gradients
         call avg2(rux2(1,10),tx ,alpha,beta,n,'tx2m',ifverbose)
         call avg2(rux2(1,11),ty ,alpha,beta,n,'ty2m',ifverbose)
         call avg2(rux2(1,12),tz ,alpha,beta,n,'tz2m',ifverbose)
-        write(*,*)'pato8'
 
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
 c     ############################################################
@@ -613,24 +486,33 @@ c     spanwise averaging
           call planar_avg(su2m(1,i),ru2m(1,i),igs_x) !x averaging
         enddo
 
-C         do i =1,nstat
-C             call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
-C         enddo
-
         if(nid.eq.0) then
-         write(*,*)'pato1'
          write(istepc,'(i32)') istep
          istepc=adjustl(istepc)
          icfile=trim('means.'//trim(istepc))
          open(unit=58,file=icfile,form='unformatted')
-         do i=1,nstat
-         write(*,*)'pato2'
-C           call x_slice(w4,stat(1,i),w1,w2,w3)
-C           call copy(w3,stat2d(1,1,1,i),m) 
-          write(58) w4
+         do i=1,4
+           call x_slice(w4,summ(1,i),w1,w2,w3)
+           write(58) w4
          enddo
+         do i=1,4
+           call x_slice(w4,su2m(1,i),w1,w2,w3)
+           write(58) w4
+         enddo
+         do i=1,6
+           call x_slice(w4,suvm(1,i),w1,w2,w3)
+           write(58) w4
+         enddo
+         do i=1,12
+           call x_slice(w4,suxm(1,i),w1,w2,w3)
+           write(58) w4
+         enddo
+         do i=1,12
+           call x_slice(w4,suxm(1,i),w1,w2,w3)
+           write(58) w4
+         enddo
+         close(58)
         endif
-
       endif
 
 
@@ -654,7 +536,9 @@ c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
 c
       mn=ny1*nely
       call rzero(tempbar,mn)
-      call planar_average_s(tempbar,t(1,1,1,1,1),w1t,w2t)
+      call planar_avg(wo1,t(1,1,1,1,1),igs_z)
+      call planar_avg(wo2,wo1,igs_z)
+      call y_line(tempbar,wo2,w1t,w2t,w3)
 c
 c     ############################################################
 
@@ -1035,7 +919,7 @@ c-----------------------------------------------------------------------
 
       subroutine x_slice (ua,u,w1,w2,w3)
 c
-c     Extract a y slice of quantity u() - assumes global tens.prod.
+c     Extract a x slice of quantity u() - assumes global tens.prod.
 c
       include 'SIZE'
       include 'GEOM'
@@ -1069,6 +953,44 @@ c
       enddo
 
       call gop(ua,w2,'+  ',myz)
+
+      return
+      end
+c---------------------------------------------------------------------      
+      subroutine y_line (ua,u,w1,w2,w3)
+c
+c     Extract a y slice of quantity u() - assumes global tens.prod.
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(ny1,nely),u(nx1*ny1*nz1*nelv)
+     $    ,w1(ny1,nely),w2(ny1,nely)
+     $     ,w3(ny1,nz1,nely,nelz)
+      integer e,eg,ex,ey,ez
+      real dy2
+c
+      my = nely*ny1
+      call copy(w3,u,nx1*ny1*nz1*nelv)
+      call rzero(ua,my)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+         i = 1
+         k = 1
+         if (ex.eq.1) then
+            do j=1,ny1
+               ua(j,ey) = w3(i,j,k,e)
+            enddo
+         endif
+      enddo
+
+      call gop(ua,w2,'+  ',my)
 
       return
       end
@@ -1202,7 +1124,7 @@ c      Add across all processors (dum --> vxin)
 c-----------------------------------------------------------------------
       subroutine planar_average_z(ua,u,w1,w2)
 c
-c     Compute r-s planar average of quantity u()
+c     Compute r-s planar average of quantity u() USED IN INTERPOLATE INFLOW
 c
       include 'SIZE'
       include 'GEOM'
