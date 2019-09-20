@@ -262,17 +262,27 @@ C      $    ,   tx2avgx(ly1,lz1,lely,lelz)
 C      $    ,   ty2avgx(ly1,lz1,lely,lelz)
 C      $    ,   tz2avgx(ly1,lz1,lely,lelz)
       parameter(nstat=38)
-      real ravg(lx1*ly1*lz1*lelt,nstat)
-      real stat(lx1*ly1*lz1*lelt,nstat)
-      real stat2d(ly1,lz1,lely,lelz,nstat)
-      save ravg, stat, stat2d
+      real rumm(lx1*ly1*lz1*lelt,4)
+      real ru2m(lx1*ly1*lz1*lelt,4)
+      real ruvm(lx1*ly1*lz1*lelt,6)
+      real ruxm(lx1*ly1*lz1*lelt,12)
+      real rux2(lx1*ly1*lz1*lelt,12)
+      real summ(lx1*ly1*lz1*lelt,4)
+      real su2m(lx1*ly1*lz1*lelt,4)
+      real suvm(lx1*ly1*lz1*lelt,6)
+      real suxm(lx1*ly1*lz1*lelt,12)
+      real sux2(lx1*ly1*lz1*lelt,12)
+c      real stat(lx1*ly1*lz1*lelt,nstat)
+c      real stat2d(ly1,lz1,lely,lelz,nstat)
+c      save ravg, stat, stat2d
+      save rumm,rux2,ruvm,ruxm,rux2,summ,sux2,suvm,suxm,sux2
       logical ifverbose
       common /gaaa/    wo1(lx1,ly1,lz1,lelv)
      &              ,  wo2(lx1,ly1,lz1,lelv)
      &              ,  wo3(lx1,ly1,lz1,lelv)
 
       real             w1(ly1,lz1,lely,lelz)
-     $              ,   w2(ly1,lz1,lely,lelz)
+     $              ,  w2(ly1,lz1,lely,lelz)
      &              ,  w3(ly1,lz1,lely,lelz)
      &              ,  w4(ly1,lz1,lely,lelz)
 
@@ -493,14 +503,18 @@ c     ############################################################
       m=ny1*nz1*nely*nelz
 c
       if(icalled.eq.0) then
+        call rzero(rumm,size(rumm))
+        call rzero(ru2m,size(ru2m))
         write(*,*)'pato5',nid
-        call rzero(ravg,size(ravg))
-        call gtpp_gs_setup(igs_x,nelx     ,nely,nelz,1) ! x-avx
+        call rzero(ruvm,size(ruvm))
+        call rzero(ruxm,size(ruxm))
+        call rzero(rux2,size(rux2))
+        call gtpp_gs_setup(igs_x,nelx,nely,nelz,1) ! x-avx
         atime = 0.
         timel = time
         icalled = 1
       endif !(icalled.eq.0)
-      write(*,*)'pato6'
+      write(*,*)'pato6',nid
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -519,58 +533,58 @@ c     averaging over time
 
         ifverbose = .false.
 c       Compute time-average of u,v,w and t       
-        call avg1(ravg(1,1),vx,alpha,beta,n,'uavg',ifverbose)
-        call avg1(ravg(1,2),vy,alpha,beta,n,'vavg',ifverbose) 
-        call avg1(ravg(1,3),vz,alpha,beta,n,'wavg',ifverbose) 
-        call avg1(ravg(1,4),t, alpha,beta,n,'tavg',ifverbose)
+        call avg1(rumm(1,1),vx,alpha,beta,n,'uavg',ifverbose)
+        call avg1(rumm(1,2),vy,alpha,beta,n,'vavg',ifverbose) 
+        call avg1(rumm(1,3),vz,alpha,beta,n,'wavg',ifverbose) 
+        call avg1(rumm(1,4),t, alpha,beta,n,'tavg',ifverbose)
 
 c       Compute time-average of u^2,v^2,w^2 and t^2     
-        call avg2(ravg(1,5),vx,alpha,beta,n,'u2mm',ifverbose)
-        call avg2(ravg(1,6),vy,alpha,beta,n,'v2mm',ifverbose) 
-        call avg2(ravg(1,7),vz,alpha,beta,n,'w2mm',ifverbose) 
-        call avg2(ravg(1,8),t ,alpha,beta,n,'t2mm',ifverbose)
+        call avg2(ru2m(1,1),vx,alpha,beta,n,'u2mm',ifverbose)
+        call avg2(ru2m(1,2),vy,alpha,beta,n,'v2mm',ifverbose) 
+        call avg2(ru2m(1,3),vz,alpha,beta,n,'w2mm',ifverbose) 
+        call avg2(ru2m(1,4),t ,alpha,beta,n,'t2mm',ifverbose)
 
 c       Compute time-average of cross products
-        call avg3(ravg(1,9 ),vx,vy,alpha,beta,n,'uvmm',ifverbose)
-        call avg3(ravg(1,10),vx,vz,alpha,beta,n,'uwmm',ifverbose)
-        call avg3(ravg(1,11),vx, t,alpha,beta,n,'utmm',ifverbose)
-        call avg3(ravg(1,12),vy,vz,alpha,beta,n,'vwmm',ifverbose)
-        call avg3(ravg(1,13),vt, t,alpha,beta,n,'vtmm',ifverbose)
-        call avg3(ravg(1,14),vz, t,alpha,beta,n,'wtmm',ifverbose)
+        call avg3(ruvm(1,1),vx,vy,alpha,beta,n,'uvmm',ifverbose)
+        call avg3(ruvm(1,2),vx,vz,alpha,beta,n,'uwmm',ifverbose)
+        call avg3(ruvm(1,3),vx, t,alpha,beta,n,'utmm',ifverbose)
+        call avg3(ruvm(1,4),vy,vz,alpha,beta,n,'vwmm',ifverbose)
+        call avg3(ruvm(1,5),vt, t,alpha,beta,n,'vtmm',ifverbose)
+        call avg3(ruvm(1,6),vz, t,alpha,beta,n,'wtmm',ifverbose)
 
 c       Compute time-average of gradients     
-        call avg1(ravg(1,15),vxx,alpha,beta,n,'uxmm',ifverbose)
-        call avg1(ravg(1,16),vxy,alpha,beta,n,'uymm',ifverbose)
-        call avg1(ravg(1,17),vxz,alpha,beta,n,'uzmm',ifverbose)
+        call avg1(ruxm(1,1),vxx,alpha,beta,n,'uxmm',ifverbose)
+        call avg1(ruxm(1,2),vxy,alpha,beta,n,'uymm',ifverbose)
+        call avg1(ruxm(1,3),vxz,alpha,beta,n,'uzmm',ifverbose)
 
-        call avg1(ravg(1,18),vyx,alpha,beta,n,'vxmm',ifverbose)
-        call avg1(ravg(1,19),vyy,alpha,beta,n,'vymm',ifverbose)
-        call avg1(ravg(1,20),vyz,alpha,beta,n,'vzmm',ifverbose)
+        call avg1(ruxm(1,4),vyx,alpha,beta,n,'vxmm',ifverbose)
+        call avg1(ruxm(1,5),vyy,alpha,beta,n,'vymm',ifverbose)
+        call avg1(ruxm(1,6),vyz,alpha,beta,n,'vzmm',ifverbose)
 
-        call avg1(ravg(1,21),vzx,alpha,beta,n,'wxmm',ifverbose)
-        call avg1(ravg(1,22),vzy,alpha,beta,n,'wymm',ifverbose)
-        call avg1(ravg(1,23),vzz,alpha,beta,n,'wzmm',ifverbose)
+        call avg1(ruxm(1,7),vzx,alpha,beta,n,'wxmm',ifverbose)
+        call avg1(ruxm(1,8),vzy,alpha,beta,n,'wymm',ifverbose)
+        call avg1(ruxm(1,9),vzz,alpha,beta,n,'wzmm',ifverbose)
 
-        call avg1(ravg(1,24),tx ,alpha,beta,n,'txmm',ifverbose)
-        call avg1(ravg(1,25),ty ,alpha,beta,n,'tymm',ifverbose)
-        call avg1(ravg(1,26),tz ,alpha,beta,n,'tzmm',ifverbose)
+        call avg1(ruxm(1,10),tx ,alpha,beta,n,'txmm',ifverbose)
+        call avg1(ruxm(1,11),ty ,alpha,beta,n,'tymm',ifverbose)
+        call avg1(ruxm(1,12),tz ,alpha,beta,n,'tzmm',ifverbose)
 
 c       Compute time-average of squared gradients
-        call avg2(ravg(1,27),vxx,alpha,beta,n,'ux2m',ifverbose)
-        call avg2(ravg(1,28),vxy,alpha,beta,n,'uy2m',ifverbose)
-        call avg2(ravg(1,29),vxz,alpha,beta,n,'uz2m',ifverbose)
+        call avg2(rux2(1,1),vxx,alpha,beta,n,'ux2m',ifverbose)
+        call avg2(rux2(1,2),vxy,alpha,beta,n,'uy2m',ifverbose)
+        call avg2(rux2(1,3),vxz,alpha,beta,n,'uz2m',ifverbose)
 
-        call avg2(ravg(1,30),vyx,alpha,beta,n,'vx2m',ifverbose)
-        call avg2(ravg(1,31),vyy,alpha,beta,n,'vy2m',ifverbose)
-        call avg2(ravg(1,32),vyz,alpha,beta,n,'vz2m',ifverbose)
+        call avg2(rux2(1,4),vyx,alpha,beta,n,'vx2m',ifverbose)
+        call avg2(rux2(1,5),vyy,alpha,beta,n,'vy2m',ifverbose)
+        call avg2(rux2(1,6),vyz,alpha,beta,n,'vz2m',ifverbose)
 
-        call avg2(ravg(1,33),vzx,alpha,beta,n,'wx2m',ifverbose)
-        call avg2(ravg(1,34),vzy,alpha,beta,n,'wy2m',ifverbose)
-        call avg2(ravg(1,35),vzz,alpha,beta,n,'wz2m',ifverbose)
+        call avg2(rux2(1,7),vzx,alpha,beta,n,'wx2m',ifverbose)
+        call avg2(rux2(1,8),vzy,alpha,beta,n,'wy2m',ifverbose)
+        call avg2(rux2(1,9),vzz,alpha,beta,n,'wz2m',ifverbose)
 
-        call avg2(ravg(1,36),tx ,alpha,beta,n,'tx2m',ifverbose)
-        call avg2(ravg(1,37),ty ,alpha,beta,n,'ty2m',ifverbose)
-        call avg2(ravg(1,38),tz ,alpha,beta,n,'tz2m',ifverbose)
+        call avg2(rux2(1,10),tx ,alpha,beta,n,'tx2m',ifverbose)
+        call avg2(rux2(1,11),ty ,alpha,beta,n,'ty2m',ifverbose)
+        call avg2(rux2(1,12),tz ,alpha,beta,n,'tz2m',ifverbose)
 
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
 c     ############################################################
@@ -579,8 +593,16 @@ c     ############################################################
       if (istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     ############################################################
 c     spanwise averaging
-        do i =1,nstat
-          call planar_avg(stat(1,i),ravg(1,i),igs_x) !x averaging
+        do i =1,12
+          call planar_avg(suxm(1,i),ruxm(1,i),igs_x) !x averaging
+          call planar_avg(sux2(1,i),rux2(1,i),igs_x) !x averaging
+        enddo
+        do i =1,6
+          call planar_avg(suvm(1,i),ruvm(1,i),igs_x) !x averaging
+        enddo
+        do i =1,4
+          call planar_avg(summ(1,i),rumm(1,i),igs_x) !x averaging
+          call planar_avg(su2m(1,i),ru2m(1,i),igs_x) !x averaging
         enddo
 
 C         do i =1,nstat
@@ -588,14 +610,14 @@ C             call x_slice(stat2d(1,1,1,1,i),stat(1,i),w1,w2)
 C         enddo
 
         if(nid.eq.0) then
-	write(*,*)'pato1'
+         write(*,*)'pato1'
          write(istepc,'(i32)') istep
          istepc=adjustl(istepc)
          icfile=trim('means.'//trim(istepc))
          open(unit=58,file=icfile,form='unformatted')
          do i=1,nstat
-	 write(*,*)'pato2'
-          call x_slice(w4,stat(1,i),w1,w2,w3)
+         write(*,*)'pato2'
+C           call x_slice(w4,stat(1,i),w1,w2,w3)
 C           call copy(w3,stat2d(1,1,1,i),m) 
           write(58) w4
          enddo
