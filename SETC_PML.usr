@@ -17,6 +17,9 @@ c - mesh and buffer zones dimensions
 #define YLEN 20.
 #define ZBUFF (31.*PI)
 #define YBUFF 12.
+#define NUMBER_ELEMENTS_X 15
+#define NUMBER_ELEMENTS_Y 44
+#define NUMBER_ELEMENTS_Z 112
 
 c - Iflow dimensions
 #define nelxin 15 /*number of elements of inflow array */
@@ -473,18 +476,18 @@ c     streamwise velocity and concentration
 
       dtimestep = abs(PARAM(12))
 c     READ INFLOW
-c      if (istep.eq.0) then
-c        call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
-c        if (set_IC_flag.eq.1) then
-c          call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
-c     $               ,nel_slab)
-c        endif
-c      endif
+C       if (istep.eq.0) then
+C         call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
+C         if (set_IC_flag.eq.1) then
+C           call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
+C      $               ,nel_slab)
+C         endif
+C       endif
 
-c     call interpolateinflow(vxin,vyin,vzin,tin
-c    $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-c    $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-c    $          ,dtimestep,int(restart_inflow))
+C      call interpolateinflow(vxin,vyin,vzin,tin
+C     $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
+C     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
+C     $          ,dtimestep,int(restart_inflow))
 
       if (mod(istep,int(iostep_inflow)).eq.0) then
 c        call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
@@ -498,6 +501,9 @@ c     OUTPUT INITIAL CONDITION
         ifxyo = .false.
       endif
 c     ############################################################
+      nelx  = NUMBER_ELEMENTS_X
+      nely  = NUMBER_ELEMENTS_Y
+      nelz  = NUMBER_ELEMENTS_Z
       n=nx1*ny1*nz1*nelv  
       nt=nx1*ny1*nz1*nelt
       m=ny1*nz1*nely*nelz
@@ -505,7 +511,6 @@ c
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
         call rzero(ru2m,size(ru2m))
-        write(*,*)'pato5',nid
         call rzero(ruvm,size(ruvm))
         call rzero(ruxm,size(ruxm))
         call rzero(rux2,size(rux2))
@@ -514,7 +519,6 @@ c
         timel = time
         icalled = 1
       endif !(icalled.eq.0)
-      write(*,*)'pato6',nid
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -524,7 +528,7 @@ c     compute gradients
       call gradm1(vyx,vyy,vyz,vy)
       call gradm1(vzx,vzy,vzz,vz)
       call gradm1(tx,ty,tz,t(1,1,1,1,1))
-            write(*,*)'pato4'
+      write(*,*)'pato4'
 c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
@@ -537,12 +541,14 @@ c       Compute time-average of u,v,w and t
         call avg1(rumm(1,2),vy,alpha,beta,n,'vavg',ifverbose) 
         call avg1(rumm(1,3),vz,alpha,beta,n,'wavg',ifverbose) 
         call avg1(rumm(1,4),t, alpha,beta,n,'tavg',ifverbose)
+        write(*,*)'pato5'
 
 c       Compute time-average of u^2,v^2,w^2 and t^2     
         call avg2(ru2m(1,1),vx,alpha,beta,n,'u2mm',ifverbose)
         call avg2(ru2m(1,2),vy,alpha,beta,n,'v2mm',ifverbose) 
         call avg2(ru2m(1,3),vz,alpha,beta,n,'w2mm',ifverbose) 
         call avg2(ru2m(1,4),t ,alpha,beta,n,'t2mm',ifverbose)
+        write(*,*)'pato6'
 
 c       Compute time-average of cross products
         call avg3(ruvm(1,1),vx,vy,alpha,beta,n,'uvmm',ifverbose)
@@ -551,6 +557,7 @@ c       Compute time-average of cross products
         call avg3(ruvm(1,4),vy,vz,alpha,beta,n,'vwmm',ifverbose)
         call avg3(ruvm(1,5),vt, t,alpha,beta,n,'vtmm',ifverbose)
         call avg3(ruvm(1,6),vz, t,alpha,beta,n,'wtmm',ifverbose)
+        write(*,*)'pato7'
 
 c       Compute time-average of gradients     
         call avg1(ruxm(1,1),vxx,alpha,beta,n,'uxmm',ifverbose)
@@ -585,6 +592,7 @@ c       Compute time-average of squared gradients
         call avg2(rux2(1,10),tx ,alpha,beta,n,'tx2m',ifverbose)
         call avg2(rux2(1,11),ty ,alpha,beta,n,'ty2m',ifverbose)
         call avg2(rux2(1,12),tz ,alpha,beta,n,'tz2m',ifverbose)
+        write(*,*)'pato8'
 
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
 c     ############################################################
@@ -649,7 +657,6 @@ c
       call planar_average_s(tempbar,t(1,1,1,1,1),w1t,w2t)
 c
 c     ############################################################
-
 
       return
       end
@@ -1079,7 +1086,7 @@ c
 c
       real ua(ny1,nely),u(nx1,ny1,nz1,nelt),w1(ny1,nely),w2(ny1,nely)
       integer e,eg,ex,ey,ez
-c
+c     
       ny = ny1*nely
       call rzero(ua,ny)
       call rzero(w1,ny)
@@ -1087,7 +1094,7 @@ c
       do e=1,nelt
          eg = lglel(e)
          call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-c
+c    
          do k=1,nz1
          do j=1,ny1
          do i=1,nx1
