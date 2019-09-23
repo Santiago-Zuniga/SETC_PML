@@ -217,7 +217,7 @@ c     is the wall-normal location where we find a concentration
 c     c<=delta_fltr
 
 
-      real timem,atimem,timelm,dtimem
+      real timem,atimem,timelm,dtimem,t_tot
 
 c     spanwise-averaged arrays
       real    yavgx(ny1,nz1,lely,lelz)
@@ -310,7 +310,6 @@ c     tke production and dissipation computation
      $     ty(lx1,ly1,lz1,lelv),
      $     tz(lx1,ly1,lz1,lelv)
 
-      real t_tot, t_old, t_new
 c     ############################################################
 c
 c     ############################################################
@@ -387,6 +386,7 @@ c
         atime = 0.
         timel = time
         icalled = 1
+        write(*,*)'pato',nid
       endif !(icalled.eq.0)
       dtime = time - timel
       atime = atime + dtime
@@ -459,12 +459,10 @@ c       Compute time-average of squared gradients
         call avg2(rux2(1,1,1,1,12),tz ,alpha,beta,n,'tz2m',ifverbose)
 
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
+      timel = time 
+
 c     ############################################################
-      timel = time
-
-
       if (istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
-c     ############################################################
 c     spanwise averaging
         do i =1,12
           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
@@ -482,72 +480,38 @@ c     spanwise averaging
           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
           call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
         enddo
-
-c         call output_means(atime,timel,dtime)
-      
-      endif
-      if (istep.eq.100) then
+         if (restart_means.ne.1) call output_means(atime,timel,dtime)
+      endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
+c     ############################################################
+c     load restart statistics and average them with the new ones   
+      if (restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then
+        call input_means(timem,atimem,timelm,dtimem)
+        t_tot=atime+atimem
+        alpha=atime/t_tot
+        beta=1-alpha
+        ifverbose= .false.
+        do i=1,4
+          call avg1(summ_2d(1,1,1,1,i),summ_2d_o(1,1,1,1,i),alpha,beta,
+     &        m,'uavg',ifverbose)
+        enddo
+        do i=1,4
+          call avg1(su2m_2d(1,1,1,1,i),su2m_2d_o(1,1,1,1,i),alpha,beta,
+     &        m,'u2mm',ifverbose)
+        enddo
+        do i=1,6
+           call avg1(suvm_2d(1,1,1,1,i),suvm_2d_o(1,1,1,1,i),alpha,beta,
+     &        m,'uvmm',ifverbose)
+        enddo
+        do i=1,12
+           call avg1(suxm_2d(1,1,1,1,i),suxm_2d_o(1,1,1,1,i),alpha,beta,
+     &        m,'uxmm',ifverbose)
+        enddo
+        do i=1,12
+           call avg1(sux2_2d(1,1,1,1,i),sux2_2d_o(1,1,1,1,i),alpha,beta,
+     &        m,'ux2m',ifverbose)
+        enddo
         call output_means(atime,timel,dtime)
-        call rzero(summ_2d,size(summ_2d))
-        call rzero(su2m_2d,size(su2m_2d))
-        call rzero(suvm_2d,size(suvm_2d))
-        call rzero(suxm_2d,size(suxm_2d))
-        call rzero(sux2_2d,size(sux2_2d))
-        atime = 0.
-        timel = time
-      endif
-
-c     this is for debugging, it will read and write means to test them t_tot, t_old, t_new
-C       if(restart_means.eq.1 .and.istep.gt.101 .and.mod(istep,100).eq.0)
-C      & then 
-C         call read_means(t_old)
-C           t_new=time-t_old !assumes time_start=0
-C           t_tot=time
-C           alpha=t_new/t_tot
-C           beta =t_old/t_tot
-C           ifverbose= .false.
-C           do i=1,4
-C            call avg1(summ_2d(1,1,1,1,i),summ_2d_o(1,1,1,1,i),beta,alpha,
-C      &        m,'uavg',ifverbose)
-C            enddo
-C                      do i=1,4
-C            call avg1(su2m_2d(1,1,1,1,i),su2m_2d_o(1,1,1,1,i),beta,alpha,
-C      &        m,'uavg',ifverbose)
-C            enddo
-C                      do i=1,6
-C            call avg1(suvm_2d(1,1,1,1,i),suvm_2d_o(1,1,1,1,i),beta,alpha,
-C      &        m,'uavg',ifverbose)
-C            enddo
-C                      do i=1,12
-C            call avg1(suxm_2d(1,1,1,1,i),suxm_2d_o(1,1,1,1,i),beta,alpha,
-C      &        m,'uavg',ifverbose)
-C            enddo
-C                      do i=1,12
-C            call avg1(sux2_2d(1,1,1,1,i),sux2_2d_o(1,1,1,1,i),beta,alpha,
-C      &        m,'uavg',ifverbose)
-C            enddo
-C            call output_means(atime,timel,dtime)
-C             call rzero(summ_2d,size(summ_2d))
-C             call rzero(su2m_2d,size(su2m_2d))
-C             call rzero(suvm_2d,size(suvm_2d))
-C             call rzero(suxm_2d,size(suxm_2d))
-C             call rzero(sux2_2d,size(sux2_2d))
-C             atime = 0.
-C             timel = time
-C       endif
-
-C         if(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then   !if the last restart file was written during the current session, don't read it and keep on time averaging
-C           call input_means(stat_old,time_old) !placeholder, fix this asap. time old should be the total time used for those means
-C           t_new=time !assumes time_start=0
-C           t_tot=t_new+t_old
-C           alpha=t_new/t_tot
-C           beta =t_old/t_tot
-C           do i =1,nstat
-C           call avg1(stat(1,i),stat_old(1,i),alpha,beta,n,'    ',.false.) !time averaging (n? shouldn't it be m?)
-C           enddo
-C         endif
-C         call write_means(stat) !placeholder, fix this asap
-
+      endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
 
 c     ############################################################
 c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
@@ -1127,7 +1091,7 @@ c
       return
       end
 
-       subroutine output_means(time,atime,timel,dtime)
+       subroutine output_means(atime,timel,dtime)
 
        include 'SIZE'
        include 'TOTAL'
@@ -1196,8 +1160,7 @@ c          icfile='means.ini'
 
       real time_old
       real atime,timel,dtime
-
-      common /gaaa/ w4(ly1,lz1,lely,lelz)
+      real w4(ly1,lz1,lely,lelz)
 
       common /avgstats_old/
      &  summ_2d_o(ly1,lz1,lely,lelz,4)
@@ -1215,7 +1178,7 @@ c          icfile='means.ini'
       call rzero(sux2_2d_o,size(sux2_2d_o))
 
       if (nid.eq.0) then
-         write(*,*)'*****READING MEANS FILE: means.ini'
+         write(*,*)'*********Reading means file: means.ini....*********'
          open(unit=58,file='means.ini',form='unformatted')
          read(58) time_old, atime,timel,dtime
          do i=1,4
