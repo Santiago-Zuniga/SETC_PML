@@ -35,21 +35,22 @@ c - Iflow dimensions
 
 c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
-      real zout
+      real zout,zdiff
        
       zout = ZLEN-PI                               !<----------CHANGE!
+      zdiff=ZLEN-zout
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
          udiff = param(2)
          if (z.ge.zout)then
-               udiff =((param(2)*VISCFAC-param(2))/PI)
+               udiff =((param(2)*VISCFAC-param(2))/zdiff)
      $            *(z-zout) + param(2)
          endif
       else if(ifield.eq.2)then                    ! temperature eqn
         utrans= param(7)
         udiff = param(8)
         if (z.ge.zout) then
-          udiff =((param(8)*VISCFAC - param(8))/PI)
+          udiff =((param(8)*VISCFAC - param(8))/zdiff)
      $           *(z-zout) + param(8)
         endif
       endif
@@ -265,29 +266,6 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
 c     depth-averaged arrays
       real zavgxy(nz1,lelz)
 
-c     depth-averaged arrays
-C       real uavgxy(nz1,lelz)
-C      $    ,vavgxy(nz1,lelz)
-C      $    ,wavgxy(nz1,lelz)
-C      $    ,tavgxy(nz1,lelz)
-C      $    ,w2avgxy(nz1,lelz)
-C      $    ,wtavgxy(nz1,lelz)
-C      $    ,wkavgxy(nz1,lelz)
-C      $    ,prodavgxy(nz1,lelz)
-C      $    ,dissavgxy(nz1,lelz)
-
-C c     depth-averaged arrays (filtered)
-C       real    uavgxy_fltr(nz1,lelz)
-C      $       ,vavgxy_fltr(nz1,lelz)
-C      $       ,wavgxy_fltr(nz1,lelz)
-C      $       ,tavgxy_fltr(nz1,lelz)
-C      $       ,w2avgxy_fltr(nz1,lelz)
-C      $       ,wtavgxy_fltr(nz1,lelz)
-C      $       ,wkavgxy_fltr(nz1,lelz)
-C      $       ,prodavgxy_fltr(nz1,lelz)
-C      $       ,dissavgxy_fltr(nz1,lelz)
-c
-
 c     dWh/dz (from cons. of mass dUh/dz=we)
       real    dzwavgxy(nz1,lelz),
      $        dzwavgxy_fltr(nz1,lelz)
@@ -484,6 +462,7 @@ c       Compute time-average of squared gradients
 c     ############################################################
       timel = time
 
+
       if (istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     ############################################################
 c     spanwise averaging
@@ -504,21 +483,58 @@ c     spanwise averaging
           call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
         enddo
 
-C         call output_means(atime,timel,dtime)
+c         call output_means(atime,timel,dtime)
       
-
-C         if (nid.eq.0)then   !!quick test for debbuging
-C           open(unit=12,file='test2du.dat')
-C           call copy(w4,summ_2d(1,1,1,1,i),m)
-C           do i=1,nely
-C             do j=1,nelz
-C               write(12,*)(w4(k,1,i,j), k=1,ny1*nz1)
-C             enddo
-C           enddo
-C           close(12)
-C         endif 
+      endif
+      if (istep.eq.100) then
+        call output_means(atime,timel,dtime)
+        call rzero(summ_2d,size(summ_2d))
+        call rzero(su2m_2d,size(su2m_2d))
+        call rzero(suvm_2d,size(suvm_2d))
+        call rzero(suxm_2d,size(suxm_2d))
+        call rzero(sux2_2d,size(sux2_2d))
+        atime = 0.
+        timel = time
       endif
 
+c     this is for debugging, it will read and write means to test them t_tot, t_old, t_new
+C       if(restart_means.eq.1 .and.istep.gt.101 .and.mod(istep,100).eq.0)
+C      & then 
+C         call read_means(t_old)
+C           t_new=time-t_old !assumes time_start=0
+C           t_tot=time
+C           alpha=t_new/t_tot
+C           beta =t_old/t_tot
+C           ifverbose= .false.
+C           do i=1,4
+C            call avg1(summ_2d(1,1,1,1,i),summ_2d_o(1,1,1,1,i),beta,alpha,
+C      &        m,'uavg',ifverbose)
+C            enddo
+C                      do i=1,4
+C            call avg1(su2m_2d(1,1,1,1,i),su2m_2d_o(1,1,1,1,i),beta,alpha,
+C      &        m,'uavg',ifverbose)
+C            enddo
+C                      do i=1,6
+C            call avg1(suvm_2d(1,1,1,1,i),suvm_2d_o(1,1,1,1,i),beta,alpha,
+C      &        m,'uavg',ifverbose)
+C            enddo
+C                      do i=1,12
+C            call avg1(suxm_2d(1,1,1,1,i),suxm_2d_o(1,1,1,1,i),beta,alpha,
+C      &        m,'uavg',ifverbose)
+C            enddo
+C                      do i=1,12
+C            call avg1(sux2_2d(1,1,1,1,i),sux2_2d_o(1,1,1,1,i),beta,alpha,
+C      &        m,'uavg',ifverbose)
+C            enddo
+C            call output_means(atime,timel,dtime)
+C             call rzero(summ_2d,size(summ_2d))
+C             call rzero(su2m_2d,size(su2m_2d))
+C             call rzero(suvm_2d,size(suvm_2d))
+C             call rzero(suxm_2d,size(suxm_2d))
+C             call rzero(sux2_2d,size(sux2_2d))
+C             atime = 0.
+C             timel = time
+C       endif
 
 C         if(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then   !if the last restart file was written during the current session, don't read it and keep on time averaging
 C           call input_means(stat_old,time_old) !placeholder, fix this asap. time old should be the total time used for those means
@@ -542,26 +558,6 @@ c
       call planar_avg(wo1,t(1,1,1,1,1),igs_z)  !wo1,2(lx1,ly1,lz1,lelv)
       call planar_avg(wo2,wo1,igs_z)
       call y_line(tempbar,wo2,w1t,w2t)
-      if (nid.eq.0)then
-        open(unit=58,file='testtempnormal',form='formatted')
-        do i=1,nely
-          do j=1,ny1
-          write(58)tempbar(j,i)
-        enddo
-        enddo
-        close(58)
-      endif
-      call y_line2(tempbar,wo2,w1t,w2t)
-      if (nid.eq.0)then
-        open(unit=58,file='testtempnew',form='formatted')
-        do i=1,nely
-          do j=1,ny1
-          write(58)tempbar(j,i)
-        enddo
-        enddo
-        close(58)
-      endif
-
       
 c
 c     ############################################################
@@ -1131,102 +1127,136 @@ c
       return
       end
 
-C       subroutine output_means(atime,timel,dtime)
+       subroutine output_means(time,atime,timel,dtime)
 
-C       include 'SIZE'
-C       include 'TOTAL'
-C       include 'ZPER'
+       include 'SIZE'
+       include 'TOTAL'
+       include 'ZPER'
 
-C       real atime,timel,dtime
-C       character*80 icfile,istepc
-C       common /gaaa/ w4(ly1,lz1,lely,lelz)
+       real atime,timel,dtime
+       character*80 icfile,istepc
+       common /gaaa/ w4(ly1,lz1,lely,lelz)
 
-C       m=ny1*nz1*lely*lelz
+      common /avgstats/
+     &  rumm(lx1,ly1,lz1,lelt,4)
+     & , ru2m(lx1,ly1,lz1,lelt,4)
+     & , ruvm(lx1,ly1,lz1,lelt,6)
+     & , ruxm(lx1,ly1,lz1,lelt,12)
+     & , rux2(lx1,ly1,lz1,lelt,12)
+     & , summ(lx1,ly1,lz1,lelt,4)
+     & , su2m(lx1,ly1,lz1,lelt,4)
+     & , suvm(lx1,ly1,lz1,lelt,6)
+     & , suxm(lx1,ly1,lz1,lelt,12)
+     & , sux2(lx1,ly1,lz1,lelt,12)
+     & , summ_2d(ly1,lz1,lely,lelz,4)
+     & , su2m_2d(ly1,lz1,lely,lelz,4)
+     & , suvm_2d(ly1,lz1,lely,lelz,6)
+     & , suxm_2d(ly1,lz1,lely,lelz,12)
+     & , sux2_2d(ly1,lz1,lely,lelz,12)
 
-C       if(nid.eq.0) then
-C          write(*,*)'*********Writing statistics.......*********'
-C          write(istepc,'(i32)') istep
-C          istepc=adjustl(istepc)
-C C          icfile=trim('means.'//trim(istepc))
-C          icfile='means.ini'
-C          open(unit=58,file=icfile,form='unformatted')
-C          write(58) time,atime,timel,dtime
-C          do i=1,4
-C            call copy(w4,summ_2d(1,1,1,1,i),m)
-C            write(58) w4
-C          enddo
-C          do i=1,4
-C            call copy(w4,su2m_2d(1,1,1,1,i),m)
-C            write(58) w4
-C          enddo
-C          do i=1,6
-C            call copy(w4,suvm_2d(1,1,1,1,i),m)
-C            write(58) w4
-C          enddo
-C          do i=1,12
-C            call copy(w4,suxm_2d(1,1,1,1,i),m)
-C            write(58) w4
-C          enddo
-C          do i=1,12
-C            call copy(w4,sux2_2d(1,1,1,1,i),m)
-C            write(58) w4
-C          enddo
-C          close(58)
-C       endif
-C       return
-C       end
 
-C       subroutine read_means(time_old)
-C       include 'SIZE'
-C       include 'TOTAL'
-C       include 'ZPER'
+       m=ny1*nz1*lely*lelz
+       if(nid.eq.0) then
+          write(*,*)'*********Writing statistics.......*********'
+          write(istepc,'(i32)') istep
+          istepc=adjustl(istepc)
+          icfile=trim('means.'//trim(istepc))
+c          icfile='means.ini'
+          open(unit=58,file=icfile,form='unformatted')
+          write(58) time,atime,timel,dtime
+          do i=1,4
+            call copy(w4,summ_2d(1,1,1,1,i),m)
+            write(58) w4
+          enddo
+          do i=1,4
+            call copy(w4,su2m_2d(1,1,1,1,i),m)
+            write(58) w4
+         enddo
+          do i=1,6
+            call copy(w4,suvm_2d(1,1,1,1,i),m)
+            write(58) w4
+          enddo
+          do i=1,12
+            call copy(w4,suxm_2d(1,1,1,1,i),m)
+            write(58) w4
+          enddo
+          do i=1,12
+            call copy(w4,sux2_2d(1,1,1,1,i),m)
+            write(58) w4
+          enddo
+          close(58)
+       endif
+       return
+       end
 
-C       real time_old
-C       real dummm
+      subroutine input_means(time_old,atime,timel,dtime)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'
 
-C       common /gaaa/ w4(ly1,lz1,lely,lelz)
+      real time_old
+      real atime,timel,dtime
 
-C       common /avgstats_old/
-C      &  summ_2d_o(ly1,lz1,lely,lelz,4)
-C      & , su2m_2d_o(ly1,lz1,lely,lelz,4)
-C      & , suvm_2d_o(ly1,lz1,lely,lelz,6)
-C      & , suxm_2d_o(ly1,lz1,lely,lelz,12)
-C      & , sux2_2d_o(ly1,lz1,lely,lelz,12)
+      common /gaaa/ w4(ly1,lz1,lely,lelz)
 
-C       m=ny1*nz1*lely*lelz
+      common /avgstats_old/
+     &  summ_2d_o(ly1,lz1,lely,lelz,4)
+     & , su2m_2d_o(ly1,lz1,lely,lelz,4)
+     & , suvm_2d_o(ly1,lz1,lely,lelz,6)
+     & , suxm_2d_o(ly1,lz1,lely,lelz,12)
+     & , sux2_2d_o(ly1,lz1,lely,lelz,12)
 
-C       call rzero(summ_2d_o,size(summ_2d_o))
-C       call rzero(su2m_2d_o,size(su2m_2d_o))
-C       call rzero(suvm_2d_o,size(suvm_2d_o))
-C       call rzero(suxm_2d_o,size(suxm_2d_o))
-C       call rzero(sux2_2d_o,size(sux2_2d_o))
+      m=ny1*nz1*lely*lelz
 
-C       if (nid.eq.0) then
-C          write(*,*)'*****READING MEANS FILE: means.ini'
-C          open(unit=58,file='means.ini',form='unformatted')
-C          read(58) time_old, dummm, dummm
-C          do i=1,4
-C           read(58) w4
-C           call copy(summ_2d_o(1,1,1,1,i),w4,m)
-C          enddo
-C          do i=1,4
-C           read(58) w4
-C           call copy(su2m_2d_o(1,1,1,1,i),w4,m)
-C          enddo
-C          do i=1,6
-C           read(58) w4
-C           call copy(suvm_2d_o(1,1,1,1,i),w4,m)
-C          enddo
-C          do i=1,12
-C           read(58) w4
-C           call copy(suxm_2d_o(1,1,1,1,i),w4,m)
-C          enddo
-C          do i=1,12
-C           read(58) w4
-C           call copy(sux2_2d_o(1,1,1,1,i),w4,m)
-C          enddo
-C          close(58)
-C       endif
+      call rzero(summ_2d_o,size(summ_2d_o))
+      call rzero(su2m_2d_o,size(su2m_2d_o))
+      call rzero(suvm_2d_o,size(suvm_2d_o))
+      call rzero(suxm_2d_o,size(suxm_2d_o))
+      call rzero(sux2_2d_o,size(sux2_2d_o))
 
+      if (nid.eq.0) then
+         write(*,*)'*****READING MEANS FILE: means.ini'
+         open(unit=58,file='means.ini',form='unformatted')
+         read(58) time_old, atime,timel,dtime
+         do i=1,4
+          read(58) w4
+          call copy(summ_2d_o(1,1,1,1,i),w4,m)
+         enddo
+         do i=1,4
+          read(58) w4
+          call copy(su2m_2d_o(1,1,1,1,i),w4,m)
+         enddo
+         do i=1,6
+          read(58) w4
+          call copy(suvm_2d_o(1,1,1,1,i),w4,m)
+         enddo
+         do i=1,12
+          read(58) w4
+          call copy(suxm_2d_o(1,1,1,1,i),w4,m)
+         enddo
+         do i=1,12
+          read(58) w4
+          call copy(sux2_2d_o(1,1,1,1,i),w4,m)
+         enddo
+         close(58)
+       endif
+      do i=1,4
+          call gop(summ_2d_o(1,1,1,1,i),w4,'+  ',m)
+      enddo
+      do i=1,4
+          call gop(su2m_2d_o(1,1,1,1,i),w4,'+  ',m)
+      enddo
+      do i=1,6
+          call gop(suvm_2d_o(1,1,1,1,i),w4,'+  ',m)
+      enddo
+      do i=1,12
+          call gop(suxm_2d_o(1,1,1,1,i),w4,'+  ',m)
+      enddo
+      do i=1,12
+          call gop(sux2_2d_o(1,1,1,1,i),w4,'+  ',m)
+      enddo
+      
+      return
+      end
 
 
