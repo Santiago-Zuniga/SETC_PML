@@ -484,7 +484,7 @@ c     spanwise averaging
       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
 c     ############################################################
 c     load restart statistics and average them with the new ones   
-      if (restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time) then
+      if(restart_means.eq.1 .and.mod(istep,istepiostep_2d_avg_time))then
         call input_means(timem,atimem,timelm,dtimem)
         t_tot=atime+atimem
         alpha=atime/t_tot
