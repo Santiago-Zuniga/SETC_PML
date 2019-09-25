@@ -361,11 +361,11 @@ c     READ INFLOW
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
      $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
      $          ,dtimestep,int(restart_inflow))
-
       if (mod(istep,int(iostep_inflow)).eq.0) then
         call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
      $                       ,z_inflow)
       endif
+
 c     ############################################################
 c     OUTPUT INITIAL CONDITION
       if (istep.eq.0) then
@@ -386,22 +386,19 @@ c
         atime = 0.
         timel = time
         icalled = 1
-        write(*,*)'pato',nid
       endif !(icalled.eq.0)
       dtime = time - timel
       atime = atime + dtime
-c     ############################################################
-
-c     compute gradients
-      call gradm1(vxx,vxy,vxz,vx)
-      call gradm1(vyx,vyy,vyz,vy)
-      call gradm1(vzx,vzy,vzz,vz)
-      call gradm1(tx,ty,tz,t(1,1,1,1,1))
 c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
         beta      = dtime / atime
         alpha     = 1. - beta
+c     compute gradients
+        call gradm1(vxx,vxy,vxz,vx)
+        call gradm1(vyx,vyy,vyz,vy)
+        call gradm1(vzx,vzy,vzz,vz)
+        call gradm1(tx,ty,tz,t(1,1,1,1,1))
 
         ifverbose = .false.
 c       Compute time-average of u,v,w and t       
@@ -409,7 +406,6 @@ c       Compute time-average of u,v,w and t
         call avg1(rumm(1,1,1,1,2),vy,alpha,beta,n,'vavg',ifverbose) 
         call avg1(rumm(1,1,1,1,3),vz,alpha,beta,n,'wavg',ifverbose) 
         call avg1(rumm(1,1,1,1,4),t, alpha,beta,n,'tavg',ifverbose)
-
 c       Compute time-average of u^2,v^2,w^2 and t^2     
         call avg2(ru2m(1,1,1,1,1),vx,alpha,beta,n,'u2mm',ifverbose)
         call avg2(ru2m(1,1,1,1,2),vy,alpha,beta,n,'v2mm',ifverbose) 
@@ -423,7 +419,6 @@ c       Compute time-average of cross products
         call avg3(ruvm(1,1,1,1,4),vy,vz,alpha,beta,n,'vwmm',ifverbose)
         call avg3(ruvm(1,1,1,1,5),vy, t,alpha,beta,n,'vtmm',ifverbose)
         call avg3(ruvm(1,1,1,1,6),vz, t,alpha,beta,n,'wtmm',ifverbose)
-
 c       Compute time-average of gradients     
         call avg1(ruxm(1,1,1,1,1),vxx,alpha,beta,n,'uxmm',ifverbose)
         call avg1(ruxm(1,1,1,1,2),vxy,alpha,beta,n,'uymm',ifverbose)
@@ -440,7 +435,6 @@ c       Compute time-average of gradients
         call avg1(ruxm(1,1,1,1,10),tx ,alpha,beta,n,'txmm',ifverbose)
         call avg1(ruxm(1,1,1,1,11),ty ,alpha,beta,n,'tymm',ifverbose)
         call avg1(ruxm(1,1,1,1,12),tz ,alpha,beta,n,'tzmm',ifverbose)
-
 c       Compute time-average of squared gradients
         call avg2(rux2(1,1,1,1,1),vxx,alpha,beta,n,'ux2m',ifverbose)
         call avg2(rux2(1,1,1,1,2),vxy,alpha,beta,n,'uy2m',ifverbose)
@@ -457,12 +451,11 @@ c       Compute time-average of squared gradients
         call avg2(rux2(1,1,1,1,10),tx ,alpha,beta,n,'tx2m',ifverbose)
         call avg2(rux2(1,1,1,1,11),ty ,alpha,beta,n,'ty2m',ifverbose)
         call avg2(rux2(1,1,1,1,12),tz ,alpha,beta,n,'tz2m',ifverbose)
-
       endif ! (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 )
       timel = time 
 
 c     ############################################################
-      if (istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
+      if (istep.ne.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     spanwise averaging
         do i =1,12
           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
@@ -480,11 +473,12 @@ c     spanwise averaging
           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
           call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
         enddo
-         if (restart_means.ne.1) call output_means(atime,timel,dtime)
+         if (restart_means.eq.0) call output_means(atime,timel,dtime)
       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
 c     ############################################################
-c     load restart statistics and average them with the new ones   
-      if(restart_means.eq.1 .and.mod(istep,istepiostep_2d_avg_time))then
+c     load restart statistics and average them with the new ones 
+      if(restart_means.ne.0 .and. 
+     &  mod(istep,int(iostep_2d_avg_time)).eq.0 .and. istep.ne.0) then
         call input_means(timem,atimem,timelm,dtimem)
         t_tot=atime+atimem
         alpha=atime/t_tot
@@ -510,7 +504,7 @@ c     load restart statistics and average them with the new ones
            call avg1(sux2_2d(1,1,1,1,i),sux2_2d_o(1,1,1,1,i),alpha,beta,
      &        m,'ux2m',ifverbose)
         enddo
-        call output_means(atime,timel,dtime)
+        call output_means(t_tot,timel,dtime)
       endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
 
 c     ############################################################
@@ -522,7 +516,6 @@ c
       call planar_avg(wo1,t(1,1,1,1,1),igs_z)  !wo1,2(lx1,ly1,lz1,lelv)
       call planar_avg(wo2,wo1,igs_z)
       call y_line(tempbar,wo2,w1t,w2t)
-      
 c
 c     ############################################################
 
@@ -780,7 +773,7 @@ c       (could generate reading issues otherwise)
         call rzero(tin_pl_dum,m)
         if (nid.eq.0) then
           write(*,*)'###### READING 2D INFLOW FILE FOR RESTART ####'
-          open(unit=58,file='inflow2d.ini',status='old',ACCESS='stream')
+          open(unit=58,file='inflow2d.ini',form='unformatted')
           read(58) z_inflow_dum
           read(58) vxin_pl_dum,vyin_pl_dum,vzin_pl_dum,tin_pl_dum
           close(58)
@@ -876,7 +869,6 @@ c
       myz = nely*nelz*ny1*nz1
       call rzero(ua,myz)
 c
-      write(*,*)'pato31'
       do e=1,nelt
 c
          eg = lglel(e)
@@ -1125,9 +1117,9 @@ c
           write(istepc,'(i32)') istep
           istepc=adjustl(istepc)
           icfile=trim('means.'//trim(istepc))
-c          icfile='means.ini'
           open(unit=58,file=icfile,form='unformatted')
           write(58) time,atime,timel,dtime
+          write(58) int(nx1),int(lelx),int(lely),int(lelz)
           do i=1,4
             call copy(w4,summ_2d(1,1,1,1,i),m)
             write(58) w4
@@ -1161,6 +1153,7 @@ c          icfile='means.ini'
       real time_old
       real atime,timel,dtime
       real w4(ly1,lz1,lely,lelz)
+      integer dumm
 
       common /avgstats_old/
      &  summ_2d_o(ly1,lz1,lely,lelz,4)
@@ -1181,6 +1174,7 @@ c          icfile='means.ini'
          write(*,*)'*********Reading means file: means.ini....*********'
          open(unit=58,file='means.ini',form='unformatted')
          read(58) time_old, atime,timel,dtime
+         read(58) dumm,dumm,dumm,dumm
          do i=1,4
           read(58) w4
           call copy(summ_2d_o(1,1,1,1,i),w4,m)
