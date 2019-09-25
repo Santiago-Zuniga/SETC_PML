@@ -4,27 +4,27 @@
 [GENERAL] 
 polynomialOrder = 7
 PnPnFormulation = yes
-minNumProcesses = 4
+minNumProcesses = 80
 
-startFrom = box0.f50001 time=0 
+startFrom = SETC_PML0.f00001 time=0 
 stopAt = numSteps
-numSteps = 100
+numSteps = 1000
 
 dt = 1.5e-4
 timeStepper = bdf3
 variableDt = no
 targetCFL = 1.0
 
-writeInterval = 1000
+writeInterval = 10
 
-userParam01 = 20       #output frequency for statistics
-userParam02 = 10       #viscosity multiplier at ouflow
-userParam03 = 200      #Ri_tau
-userParam04 = 0.08     #u_target for top PML, positive
-userParam05 = 1        #whether to read inflow2d.ini (2d) for restasting
-userParam06 = 20       #iostep_inflow
-userParam07 = 0.001    #integration filter limit 
-userParam08 = 0        #Restart of means flag (reads means.ini binary files)
+userParam01 = 100       #output frequency for statistics
+userParam02 = 10        #viscosity multiplier at ouflow
+userParam03 = 200       #Ri_tau
+userParam04 = 0.08      #u_target for top PML, positive
+userParam05 = 1         #whether to read inflow2d.ini (2d) for restasting
+userParam06 = 100       #iostep_inflow
+userParam07 = 0.001     #integration filter limit 
+userParam08 = 0         #Restart of means flag (reads means.ini binary files)
 
 [MESH]
 numberOfBCFields = 2
