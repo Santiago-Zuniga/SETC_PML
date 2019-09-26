@@ -254,13 +254,12 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
       logical ifverbose
       common /gaaa/    wo1(lx1,ly1,lz1,lelv)
      &              ,  wo2(lx1,ly1,lz1,lelv)
-     &              ,  wo3(lx1,ly1,lz1,lelv)
+     
 
       real             w1(ly1,lz1,lely,lelz)
-     $              ,  w2(ly1,lz1,lely,lelz)
+     &              ,  w2(ly1,lz1,lely,lelz)
      &              ,  w3(ly1,lz1,lely,lelz)
      &              ,  w4(ly1,lz1,lely,lelz)
-
       save igs_x, igs_z
 
 c     depth-averaged arrays
@@ -372,7 +371,9 @@ c     OUTPUT INITIAL CONDITION
         ifxyo = .true.
         call prepost(.true.,'   ' )
         ifxyo = .false.
+        call print_yz_mesh
       endif
+
 c     ############################################################
 c
       if(icalled.eq.0) then
@@ -773,7 +774,8 @@ c       (could generate reading issues otherwise)
         call rzero(tin_pl_dum,m)
         if (nid.eq.0) then
           write(*,*)'###### READING 2D INFLOW FILE FOR RESTART ####'
-          open(unit=58,file='inflow2d.ini',form='unformatted')
+          open(unit=58,file='inflow2d.ini',access='stream',
+     &       form='unformatted')
           read(58) z_inflow_dum
           read(58) vxin_pl_dum,vyin_pl_dum,vzin_pl_dum,tin_pl_dum
           close(58)
@@ -888,10 +890,11 @@ c
 
       return
       end
+
 c---------------------------------------------------------------------      
       subroutine y_line (ua,u,w1,w2)
 c
-c     Extract a y slice of quantity u() - assumes global tens.prod.
+c     Extract a y line of quantity u() - assumes global tens.prod.
 c
       include 'SIZE'
       include 'GEOM'
@@ -923,41 +926,7 @@ c
 
       return
       end
-      subroutine y_line2 (ua,u,w1,w2)
-c
-c     Extract a y slice of quantity u() - assumes global tens.prod.
-c
-      include 'SIZE'
-      include 'GEOM'
-      include 'PARALLEL'
-      include 'WZ'
-      include 'ZPER'
-c
-      real ua(ny1,nely),u(nx1,ny1,nz1,nelv)
-     $    ,w1(ny1,nely),w2(ny1,nely)
-      integer e,eg,ex,ey,ez
-      real dy2
-c
-      my = nely*ny1
-      call rzero(ua,my)
-      call rzero(w2,my)
-c
-      do e=1,nelt
-c
-         eg = lglel(e)
-         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-         i = 1
-         k = 1
-         if (ex.eq.1 .and. ez.eq.1) then
-            do j=1,ny1
-               w2(j,ey) = u(i,j,k,e)
-            enddo
-         endif
-      enddo
-      call gop(w2,ua,'+  ',my)
 
-      return
-      end
 
 c     ############################################################
       subroutine output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl
@@ -982,7 +951,8 @@ c    ----------------------------------------------------------
         write(istepc_inflow,'(i32)') istep
         istepc_inflow=adjustl(istepc_inflow)
         icfile_inflow=trim('inflow2d'//'.'//trim(istepc_inflow))
-        open(unit=58,file=icfile_inflow,form='unformatted')
+        open(unit=58,file=icfile_inflow,access='stream',
+     &     form='unformatted')
         write(58) z_inflow
         write(58) vxin_pl,vyin_pl,vzin_pl,tin_pl
         close(58)
@@ -1117,7 +1087,7 @@ c
           write(istepc,'(i32)') istep
           istepc=adjustl(istepc)
           icfile=trim('means.'//trim(istepc))
-          open(unit=58,file=icfile,form='unformatted')
+          open(unit=58,file=icfile,access='stream',form='unformatted')
           write(58) time,atime,timel,dtime
           write(58) int(nx1),int(lelx),int(lely),int(lelz)
           do i=1,4
@@ -1172,7 +1142,8 @@ c
 
       if (nid.eq.0) then
          write(*,*)'*********Reading means file: means.ini....*********'
-         open(unit=58,file='means.ini',form='unformatted')
+         open(unit=58,file='means.ini',access='stream',
+     &     form='unformatted')
          read(58) time_old, atime,timel,dtime
          read(58) dumm,dumm,dumm,dumm
          do i=1,4
@@ -1216,4 +1187,105 @@ c
       return
       end
 
+      subroutine print_yz_mesh
 
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+
+
+      real ymm(ly1,lz1,lely,lelz),zmm(ly1,lz1,lely,lelz)
+
+c     xmm --> yz slice; ymm --> xz slice; zmm --> xy slice  
+
+      real w1(ly1,lz1,lely,lelz),w2(ly1,lz1,lely,lelz)
+
+
+      call x_slice(ymm,ym1,w1,w2)
+      call x_slice(zmm,zm1,w1,w2)
+
+      if(nid.eq.0) then
+          write(*,*)'*********Writing y-z plane mesh.......*********'
+          write(istepc,'(i32)') istep
+          open(unit=58,file='yzmesh.dat',
+     &       access='stream',form='unformatted')
+          write(58)ly1,lz1,lely,lelz
+          write(58)ymm,zmm
+          close(58)
+      endif
+      return
+      end
+
+c-----------------------------------------------------------------------
+C       subroutine outfld2d_yx(u,v,w,t,ny,nz,nly,nlz,name,ifld)
+
+C       include 'SIZE'
+C       include 'TOTAL'
+
+C       real u(ny*nz*nly*nlz)
+C       real v(ny*nz*nly*nlz)
+C       real w(ny*nz*nly*nlz)
+C       real t(ny*nz*nly*nlz)
+C       character*3 name
+
+C       character*2  excode(15)
+C       character*12 fm
+C       character*20 outfile
+
+C c     if (istep.le.10) write(6,*) nid,' in out2d:',iz
+
+C       call blank(excode,30)
+C c
+C c     excode(1) = 'X '
+C c     excode(2) = 'Y '
+C c     excode(3) = 'U '
+C c     excode(4) = 'V '
+C c     excode(5) = 'P '
+C c     excode(6) = 'T '
+C c
+C       excode(4) = 'U '
+C       excode(5) = '  '
+C       excode(6) = 'T '
+C       nthings   =  4
+
+C       ierr = 0 
+C       if (nid.eq.0) then
+C          call blank(outfile,20)
+C          if (ifld.lt.100) then
+C             write(outfile,2) name,ifld
+C     2       format(a3,'2d.fld',i2.2)
+C          elseif (ifld.lt.1000) then
+C             write(outfile,3) name,ifld
+C     3       format(a3,'2d.fld',i3)
+C          elseif (ifld.lt.10000) then
+C             write(outfile,4) name,ifld
+C     4       format(a3,'2d.fld',i4)
+C          elseif (ifld.lt.100000) then
+C             write(outfile,5) name,ifld
+C     5       format(a3,'2d.fld',i5)
+C          elseif (ifld.lt.1000000) then
+C             write(outfile,6) name,ifld
+C     6       format(a3,'2d.fld',i6)
+C          endif
+C          open(unit=24,file=outfile,status='unknown')
+C          call dump_header2d(excode,ny,nz,nly,nlz,ierr)
+
+C          n = ny*nz*nly*nlz
+C          write(fm,10) nthings
+C c        write(6,*) fm
+C c        call exitt
+C          write(24,fm) (u(i),v(i),w(i),t(i),i=1,n)
+C    10    format('(1p',i1,'e14.6)')
+C c  10    format('''(1p',i1,'e15.7)''')
+C c  10    format(1p7e15.7)
+C c
+C          close(24)
+C       endif
+C       call err_chk(ierr,'Error using byte_write,outfld2d. Abort.$')
+
+C       return
+C       end
+
+C       subroutine print_2d_files
