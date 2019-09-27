@@ -514,7 +514,7 @@ c     load restart statistics and average them with the new ones
       endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
 c     ############################################################
 c     write 2d fld spanwise-averaged files 
-      if(mod(istep,int(iostep_2d_notime)).eq.0 .and.istep.ne.0) then
+      if(mod(istep,int(iostep_2d_notime)).eq.0) then
           if(istep.eq.int(iostep_2d_notime))then
               call x_slice(y2d,ym1,w1,w2)
               call x_slice(z2d,zm1,w1,w2)
@@ -527,9 +527,9 @@ c     write 2d fld spanwise-averaged files
 
           call planar_avg(wo1,t(1,1,1,1,1),igs_x) 
           call x_slice(tt2d,wo1,w1,w2)
-
+          icnt_time=istep+1
           call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ny1,nz1,nely,nelz,'sag',
-     &       istep)
+     &       icnt_time)
       endif
 
 
