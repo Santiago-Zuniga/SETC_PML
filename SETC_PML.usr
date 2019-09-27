@@ -624,9 +624,6 @@ c-----------------------------------------------------------------------
       zh=(ZLEN)/2.0
       A1=zh/RITAU   !zh*tan(theta)
       A2=zh/RITAU2
-      write(*,*)'pato',theta1,theta2,zh,A1,A2
-
-
       n=8*nelt
 c
       nelyint = 30
