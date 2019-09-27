@@ -8,6 +8,7 @@ c- constants -----------------------------------------------------------
 #define iostep_2d_notime uparam(7)    /*output frequency for spanwise-averaged statistics*/
 #define iostep_inflow uparam(8)       /* frequency of output for inflow2d file */
 #define delta_fltr uparam(9)          /* integration filter limit */
+#define RITAU2 uparam(10)               /* Ri_tau2 (downstream from the break in slope) */
 #define RE_TAU (1/param(2))           /* Re_tau */
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
@@ -613,7 +614,17 @@ c-----------------------------------------------------------------------
       include 'TOTAL'
       
       integer n,nelyint,nelytot,mmnely
-      real hfh,hfint,amp,delyi,rrleny,rrlenyint,y
+      real hfh,hfint,amp,delyi,rrleny,rrlenyint,y,z
+      real theta1, theta2, A1, A2, zh
+
+
+      theta1=atan(1/RITAU)
+      theta2=atan(1/Ri_tau2)
+      zh=(ZLEN)/2.0
+      A1=zh/RITAU   !zh*tan(theta)
+      A2=zh/RITAU2
+      write(*,*)'pato',theta1,theta2,zh,A1,A2
+
 
       n=8*nelt
 c
@@ -627,6 +638,7 @@ c
       hfint = rrlenyint
       amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
 
+c     vertical grid spacing      
       do i=1,n
         yc(i,1)  = rrleny * yc(i,1) 
         y=yc(i,1)
@@ -645,6 +657,28 @@ c
         xc(i,1) =  XLEN * xc(i,1)
 c        xc(i,1) =  2.0 * pi * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
+      enddo
+
+
+c     sloping
+      do i=1,n
+        y=yc(i,1)
+        z=zc(i,1)
+        if(z.lt.zh) then
+          if(y.le.hfint) then
+            yc(i,1)=y+A1*((-1.0/zh)*z+1)+A2
+          else
+            yc(i,1)=y+((-A1/(YLEN-hfint))*(y-hfint)+A1)*((-1.0/zh)*z+1)+
+     &                ((-A2/(YLEN-hfint))*(y-hfint)+A2)
+          endif !(y.le.hfint)
+        else
+          if(y.le.hfint) then
+            yc(i,1)=y+A2*((-1.0/zh)*(z-zh)+1)
+          else
+            yc(i,1)=y+((-A2/(YLEN-hfint))*(y-hfint)+A2)*((-1.0/zh)*
+     &                (z-zh)+1)
+          endif !(y.le.hfint)
+        endif !(z.lt.zh)
       enddo
 
       return
