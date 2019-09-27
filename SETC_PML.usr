@@ -1,15 +1,14 @@
 c- constants -----------------------------------------------------------
-
-#define iostep_2d_avg_time  uparam(1) /* output frequency for statistics */
-#define VISCFAC uparam(2)             /* viscosity multiplier at ouflow */
-#define RITAU uparam(3)               /* Ri_tau */
-#define UTARGET uparam(4)             /* u_target for top PML, positive */ 
-#define restart_inflow uparam(5)      /* whether to read inflow2d.ini (2d) for restasting */
-#define iostep_inflow uparam(6)       /* frequency of output for inflow2d file */
-#define delta_fltr uparam(7)          /* integration filter limit */
-#define restart_means uparam(8)       /* Restart of means flag (reads means.ini binary files) */
-
-#define RE_TAU (1/param(2))
+#define RITAU uparam(1)               /* Ri_tau */
+#define UTARGET uparam(2)             /* u_target for top PML, positive */ 
+#define VISCFAC uparam(3)             /* viscosity multiplier at ouflow */
+#define restart_inflow uparam(4)      /* whether to read inflow2d.ini (2d) for restasting */
+#define restart_means uparam(5)       /* whether to read means.ini for means restasting */
+#define iostep_2d_avg_time  uparam(6) /* output frequency for spanwise-time-averaged statistics */
+#define iostep_2d_notime uparam(7)    /*output frequency for spanwise-averaged statistics*/
+#define iostep_inflow uparam(8)       /* frequency of output for inflow2d file */
+#define delta_fltr uparam(9)          /* integration filter limit */
+#define RE_TAU (1/param(2))           /* Re_tau */
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
 #define ZLEN (32.*PI)
@@ -208,8 +207,8 @@ c     Output frequency of span-time-averaged .fld files
 c     and means.* binary files
 
 c     Output frequency of span-averaged .fld files
-      integer iostep_2d
-      parameter( iostep_2d= 1000 )          !<-----------CHANGE!
+C       integer iostep_2d
+C       parameter( iostep_2d= 1000 )          !<-----------CHANGE!
 
 c     Integration filter: The moments of velocity and concentration
 c     are computed from z=0 to z=z_delta_fltr where z_delta_fltr
@@ -261,6 +260,12 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
      &              ,  w3(ly1,lz1,lely,lelz)
      &              ,  w4(ly1,lz1,lely,lelz)
       save igs_x, igs_z
+
+c     2d spanwise-averaged arrays 
+      real v2d(ly1,lz1,lely,lelz),w2d(ly1,lz1,lely,lelz),
+     &     y2d(ly1,lz1,lely,lelz),z2d(ly1,lz1,lely,lelz),
+     &     tt2d(ly1,lz1,lely,lelz)
+
 
 c     depth-averaged arrays
       real zavgxy(nz1,lelz)
@@ -507,6 +512,26 @@ c     load restart statistics and average them with the new ones
         enddo
         call output_means(t_tot,timel,dtime)
       endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
+c     ############################################################
+c     write 2d fld spanwise-averaged files 
+      if(mod(istep,int(iostep_2d_notime)).eq.0 .and.istep.ne.0) then
+          if(istep.eq.int(iostep_2d_notime))then
+              call x_slice(y2d,ym1,w1,w2)
+              call x_slice(z2d,zm1,w1,w2)
+          endif
+          call planar_avg(wo1,vz,igs_x) 
+          call x_slice(w2d,wo1,w1,w2)
+
+          call planar_avg(wo1,vy,igs_x) 
+          call x_slice(v2d,wo1,w1,w2)
+
+          call planar_avg(wo1,t(1,1,1,1,1),igs_x) 
+          call x_slice(tt2d,wo1,w1,w2)
+
+          call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ny1,nz1,nely,nelz,'sag',
+     &       istep)
+      endif
+
 
 c     ############################################################
 c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
@@ -514,7 +539,7 @@ c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
 c
       mn=ny1*nely
       call rzero(tempbar,mn)
-      call planar_avg(wo1,t(1,1,1,1,1),igs_z)  !wo1,2(lx1,ly1,lz1,lelv)
+      call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
       call planar_avg(wo2,wo1,igs_z)
       call y_line(tempbar,wo2,w1t,w2t)
 c
@@ -1219,73 +1244,83 @@ c     xmm --> yz slice; ymm --> xz slice; zmm --> xy slice
       end
 
 c-----------------------------------------------------------------------
-C       subroutine outfld2d_yx(u,v,w,t,ny,nz,nly,nlz,name,ifld)
+      subroutine outfld2d_yz(z,y,w,v,tt,ny,nz,nly,nlz,name,ifld)
 
-C       include 'SIZE'
-C       include 'TOTAL'
+      include 'SIZE'
+      include 'TOTAL'
 
-C       real u(ny*nz*nly*nlz)
-C       real v(ny*nz*nly*nlz)
-C       real w(ny*nz*nly*nlz)
-C       real t(ny*nz*nly*nlz)
-C       character*3 name
+      real z(ny,nz,nly,nlz)
+      real y(ny,nz,nly,nlz)
+      real v(ny,nz,nly,nlz)
+      real w(ny,nz,nly,nlz)
+      real tt(ny,nz,nly,nlz)
+      character*3 name
 
-C       character*2  excode(15)
-C       character*12 fm
-C       character*20 outfile
+      character*2  excode(15)
+      character*12 fm
+      character*20 outfile
 
-C c     if (istep.le.10) write(6,*) nid,' in out2d:',iz
+c     if (istep.le.10) write(6,*) nid,' in out2d:',iz
 
-C       call blank(excode,30)
-C c
-C c     excode(1) = 'X '
-C c     excode(2) = 'Y '
-C c     excode(3) = 'U '
-C c     excode(4) = 'V '
-C c     excode(5) = 'P '
-C c     excode(6) = 'T '
-C c
-C       excode(4) = 'U '
-C       excode(5) = '  '
-C       excode(6) = 'T '
-C       nthings   =  4
+      call blank(excode,30)
+c
+      excode(1) = 'X '
+      excode(2) = 'Y '
+c     excode(3) = 'U '
+c     excode(4) = 'V '
+c     excode(5) = 'P '
+c     excode(6) = 'T '
+c
+      excode(4) = 'U '
+      excode(5) = '  '
+      excode(6) = 'T '
+      nthings   =  6
 
-C       ierr = 0 
-C       if (nid.eq.0) then
-C          call blank(outfile,20)
-C          if (ifld.lt.100) then
-C             write(outfile,2) name,ifld
-C     2       format(a3,'2d.fld',i2.2)
-C          elseif (ifld.lt.1000) then
-C             write(outfile,3) name,ifld
-C     3       format(a3,'2d.fld',i3)
-C          elseif (ifld.lt.10000) then
-C             write(outfile,4) name,ifld
-C     4       format(a3,'2d.fld',i4)
-C          elseif (ifld.lt.100000) then
-C             write(outfile,5) name,ifld
-C     5       format(a3,'2d.fld',i5)
-C          elseif (ifld.lt.1000000) then
-C             write(outfile,6) name,ifld
-C     6       format(a3,'2d.fld',i6)
-C          endif
-C          open(unit=24,file=outfile,status='unknown')
-C          call dump_header2d(excode,ny,nz,nly,nlz,ierr)
+      ierr = 0 
+      if (nid.eq.0) then
+         write(*,*)'******Writing spanwise-averaged fld file....*******'
+         call blank(outfile,20)
+         if (ifld.lt.100) then
+            write(outfile,2) name,ifld
+    2       format(a3,'2d.fld',i2.2)
+         elseif (ifld.lt.1000) then
+            write(outfile,3) name,ifld
+    3       format(a3,'2d.fld',i3)
+         elseif (ifld.lt.10000) then
+            write(outfile,4) name,ifld
+    4       format(a3,'2d.fld',i4)
+         elseif (ifld.lt.100000) then
+            write(outfile,5) name,ifld
+    5       format(a3,'2d.fld',i5)
+         elseif (ifld.lt.1000000) then
+            write(outfile,6) name,ifld
+    6       format(a3,'2d.fld',i6)
+         endif
+         open(unit=24,file=outfile,status='unknown')
+         call dump_header2d(excode,ny,nz,nly,nlz,ierr)
 
-C          n = ny*nz*nly*nlz
-C          write(fm,10) nthings
-C c        write(6,*) fm
-C c        call exitt
-C          write(24,fm) (u(i),v(i),w(i),t(i),i=1,n)
-C    10    format('(1p',i1,'e14.6)')
-C c  10    format('''(1p',i1,'e15.7)''')
-C c  10    format(1p7e15.7)
-C c
-C          close(24)
-C       endif
-C       call err_chk(ierr,'Error using byte_write,outfld2d. Abort.$')
+         n = ny*nz*nly*nlz
+c        write(6,*) fm
+c        call exitt
+C          write(24,fm) (z(i),y(i),u(i),v(i),w(i),t(i),i=1,n)
 
-C       return
-C       end
+          do l=1,nlz
+             do k=1,nly
+                 do j=1,nz
+                   do i=1,ny
+                     write(24,'(1p5e14.6)') z(i,j,k,l),y(i,j,k,l),
+     &                   w(i,j,k,l),v(i,j,k,l),tt(i,j,k,l)
+                   enddo
+                 enddo
+              enddo
+          enddo
+c  10    format('''(1p',i1,'e15.7)''')
+c  10    format(1p7e15.7)
+c
+         close(24)
+      endif
+      call err_chk(ierr,'Error using byte_write,outfld2d. Abort.$')
 
-C       subroutine print_2d_files
+      return
+      end
+
