@@ -80,7 +80,7 @@ c     BUFFER ZONE VARIABLES
 
 c     MESH VARIABLES
       egrav(1) = 0.0                !x: Spanwise direction
-      egrav(2) = (-1)*RITAU         !y: Wall-normal direction
+      egrav(2) = 0.0                !y: Wall-normal direction
       egrav(3) = 1.0                !z: Streamwise direction
 
 c     Note: this is an acceleration term, NOT a force!
@@ -88,7 +88,8 @@ c     Thus, ffx will subsequently be multiplied by rho(x,t).
       call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
 
       ffx = temp*egrav(1)
-      ffy = (temp - tempbar(iy,ey))*egrav(2)
+C       ffy = (temp - tempbar(iy,ey))*egrav(2)
+      ffy = temp*egrav(2)
       ffz = temp*egrav(3)
 c     ############################################################
 c     ############################################################
