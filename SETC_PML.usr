@@ -80,8 +80,8 @@ c     BUFFER ZONE VARIABLES
 
 c     MESH VARIABLES
       egrav(1) = 0.0                !x: Spanwise direction
-      egrav(2) = 0.0                !y: Wall-normal direction
-      egrav(3) = 1.0                !z: Streamwise direction
+      egrav(2) = -1.0                !y: Wall-normal direction
+      egrav(3) = 0.0                !z: Streamwise direction
 
 c     Note: this is an acceleration term, NOT a force!
 c     Thus, ffx will subsequently be multiplied by rho(x,t).
@@ -324,12 +324,21 @@ c     HYDROSTATIC PRESSURE VARIABLES
      $             ,w1t(ly1,lely)
      $             ,w2t(ly1,lely)
 
+      parameter (llt=lx1*ly1*lz1*lelt)
+      common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
+
       nelx  = NUMBER_ELEMENTS_X
       nely  = NUMBER_ELEMENTS_Y
       nelz  = NUMBER_ELEMENTS_Z
       n=nx1*ny1*nz1*nelv  
       nt=nx1*ny1*nz1*nelt
       m=ny1*nz1*nely*nelz
+      if (istep.eq.0) then
+       call opcopy(xm1,ym1,zm1,xmo,ymo,zmo)  ! Restore my geometry
+
+       call geom_reset(1)                    ! Force regen. of Jacobians 
+      endif
+
 c
 cc     ############################################################
 cc     BUFFER REGION VARIABLES (by JS, has not been modified)
@@ -626,8 +635,8 @@ c-----------------------------------------------------------------------
       A2=zh/RITAU2
       n=8*nelt
 c
-      nelyint = 30
       nelytot = NUMBER_ELEMENTS_Y
+      nelyint = int(nelytot/1.5)+1.0 !30 for nely 44
 
       delyi =hf/nelyin
       rrleny = nelytot*delyi 
@@ -650,10 +659,9 @@ c     vertical grid spacing
           yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
         elseif (y.gt.hfint) then
           y = y/rrleny
-          yc(i,1)=y*nelytot-24
+          yc(i,1)=y*nelytot-(nelytot-YLEN)
         endif
         xc(i,1) =  XLEN * xc(i,1)
-c        xc(i,1) =  2.0 * pi * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
       enddo
 
@@ -684,6 +692,10 @@ c     sloping
       subroutine usrdat2
       include 'SIZE'
       include 'TOTAL'
+      parameter (llt=lx1*ly1*lz1*lelt)
+      common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
+ 
+      call opcopy(xmo,ymo,zmo,xm1,ym1,zm1)  ! Preserve my geometry
 c
       return
       end
