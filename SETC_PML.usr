@@ -362,7 +362,7 @@ c     Computes the inlet boundary condition for the next time step
 c     interpolating the solution for a TC with fixed mean 
 c     streamwise velocity and concentration
 
-      dtimestep = abs(PARAM(12))
+      dtimestep = abs(dt)
 c     READ INFLOW
       if (istep.eq.0) then
         call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
