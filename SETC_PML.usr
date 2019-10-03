@@ -1063,7 +1063,7 @@ c      Read IC file
          if(k.eq.3) icfile=trim('vz_inflow.ini')
          if(k.eq.4) icfile=trim('temp_inflow.ini')
          write(*,*)'*****READING INFLOW FILE: ',icfile
-         open(unit=58,file=icfile,status='old', ACCESS='stream')
+         open(unit=58,file=icfile,access='stream',form='unformatted')
          read(58) dum
          close(58)
        endif
