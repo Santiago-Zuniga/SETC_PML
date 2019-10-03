@@ -79,9 +79,9 @@ c     BUFFER ZONE VARIABLES
      $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
 
 c     MESH VARIABLES
-      egrav(1) = 0.0                !x: Spanwise direction
-      egrav(2) = -1.0                !y: Wall-normal direction
-      egrav(3) = 0.0                !z: Streamwise direction
+      egrav(1) = 0.0                         !x: Spanwise direction
+      egrav(2) = -1.0*sqrt(1+RITAU**2)       !y: Wall-normal direction
+      egrav(3) = 0.0                         !z: Streamwise direction
 
 c     Note: this is an acceleration term, NOT a force!
 c     Thus, ffx will subsequently be multiplied by rho(x,t).
