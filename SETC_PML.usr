@@ -17,15 +17,17 @@ c - mesh and buffer zones dimensions
 #define YLEN 20.
 #define ZBUFF (31.*PI)
 #define YBUFF 12.
-#define NUMBER_ELEMENTS_X 15
-#define NUMBER_ELEMENTS_Y 44
-#define NUMBER_ELEMENTS_Z 112
+#define NUMBER_ELEMENTS_X 8
+#define NUMBER_ELEMENTS_Y 27
+#define NUMBER_ELEMENTS_Z 56
 
 c - Iflow dimensions
-#define nelxin 15 /*number of elements of inflow array */
-#define nelyin 9
-#define nelzin 28
+#define nelxin 8 /*number of elements of inflow array */
+#define nelyin 4
+#define nelzin 14
+#define zlen_inflow (8.*PI)
 #define hf 2.0 /*height of inflow domain*/
+#define nelyint 13
 
 
       subroutine uservp (ix,iy,iz,eg)
@@ -333,9 +335,9 @@ c     HYDROSTATIC PRESSURE VARIABLES
       n=nx1*ny1*nz1*nelv  
       nt=nx1*ny1*nz1*nelt
       m=ny1*nz1*nely*nelz
+c     Restore geometry after loading the IC 
       if (istep.eq.0) then
        call opcopy(xm1,ym1,zm1,xmo,ymo,zmo)  ! Restore my geometry
-
        call geom_reset(1)                    ! Force regen. of Jacobians 
       endif
 
@@ -374,8 +376,8 @@ c     READ INFLOW
 
       call interpolateinflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-     $          ,dtimestep,int(restart_inflow))
+     $           ,nelin,nel_slab,nelzin,z_inflow
+     $          ,zlen_inflow,dtimestep,int(restart_inflow))
       if (mod(istep,int(iostep_inflow)).eq.0) then
         call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
      $                       ,z_inflow)
@@ -623,7 +625,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       
-      integer n,nelyint,nelytot,mmnely
+      integer n,nelytot,mmnely
       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y,z
       real theta1, theta2, A1, A2, zh
 
@@ -636,7 +638,6 @@ c-----------------------------------------------------------------------
       n=8*nelt
 c
       nelytot = NUMBER_ELEMENTS_Y
-      nelyint = int(nelytot/1.5)+1.0 !30 for nely 44
 
       delyi =hf/nelyin
       rrleny = nelytot*delyi 
@@ -759,8 +760,8 @@ c        l local gl global el element
        enddo
        uadum = uadum / w1dum ! Normalize
       endif
-      call gop(uadum,ua,'+  ',1)      
-      call gop(w1dum,w1,'+  ',1)      
+      call gop(ua,uadum,'+  ',1)      
+      call gop(w1,w1dum,'+  ',1)      
 
 
       return
@@ -1053,26 +1054,41 @@ c     -----------------------------------------------------
       call rzero(vyin,nin)
       call rzero(vzin,nin)
       call rzero(tin,nin)
-      do k=1,4 !only works with 3d TC
+
 c      Zero all dummy arrays
        call rzero(dum,nin)
+       call rzero(vxin,nin)
+       call rzero(vyin,nin)
+       call rzero(vzin,nin)
+       call rzero(tin,nin)
 c      Read IC file
-       if (nid.eq.0) then
-         if(k.eq.1) icfile=trim('vx_inflow.ini')
-         if(k.eq.2) icfile=trim('vy_inflow.ini')
-         if(k.eq.3) icfile=trim('vz_inflow.ini')
-         if(k.eq.4) icfile=trim('temp_inflow.ini')
+      if (nid.eq.0) then
+         icfile=trim('vx_inflow.ini')
          write(*,*)'*****READING INFLOW FILE: ',icfile
          open(unit=58,file=icfile,access='stream',form='unformatted')
-         read(58) dum
+         read(58) vxin
          close(58)
-       endif
-c      Add across all processors (dum --> vxin)
-       if(k.eq.1) call gop(dum,vxin,'+  ',nin)
-       if(k.eq.2) call gop(dum,vyin,'+  ',nin)
-       if(k.eq.3) call gop(dum,vzin,'+  ',nin)
-       if(k.eq.4) call gop(dum,tin,'+  ',nin)
-      enddo
+         icfile=trim('vy_inflow.ini')
+         write(*,*)'*****READING INFLOW FILE: ',icfile
+         open(unit=58,file=icfile,access='stream',form='unformatted')
+         read(58) vyin
+         close(58)
+         icfile=trim('vz_inflow.ini')
+         write(*,*)'*****READING INFLOW FILE: ',icfile
+         open(unit=58,file=icfile,access='stream',form='unformatted')
+         read(58) vzin
+         close(58)
+         icfile=trim('temp_inflow.ini')
+         write(*,*)'*****READING INFLOW FILE: ',icfile
+         open(unit=58,file=icfile,access='stream',form='unformatted')
+         read(58) tin
+         close(58)
+      endif
+c     Add through all processors  
+      call gop(vxin,dum,'+  ',nin)
+      call gop(vyin,dum,'+  ',nin)
+      call gop(vzin,dum,'+  ',nin)
+      call gop(tin,dum,'+  ',nin)
 
       return
       end
