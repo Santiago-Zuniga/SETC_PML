@@ -25,6 +25,8 @@ c - Iflow dimensions
 #define nelyin 9
 #define nelzin 28
 #define hf 2.0 /*height of inflow domain*/
+#define zlen_inflow (8.*PI)
+#define nelyint 30
 
 
       subroutine uservp (ix,iy,iz,eg)
@@ -363,8 +365,8 @@ c     READ INFLOW
 
       call interpolateinflow(vxin,vyin,vzin,tin
      $           ,vxin_pl,vyin_pl,vzin_pl,tin_pl
-     $           ,nelin,nel_slab,nelzin,z_inflow,ZLEN
-     $          ,dtimestep,int(restart_inflow))
+     $           ,nelin,nel_slab,nelzin,z_inflow,
+     $          zlen_inflow,dtimestep,int(restart_inflow))
       if (mod(istep,int(iostep_inflow)).eq.0) then
         call output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl,nel_slab
      $                       ,z_inflow)
@@ -612,12 +614,11 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       
-      integer n,nelyint,nelytot,mmnely
+      integer n,nelytot,mmnely
       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y
 
       n=8*nelt
 c
-      nelyint = 30
       nelytot = NUMBER_ELEMENTS_Y
 
       delyi =hf/nelyin
