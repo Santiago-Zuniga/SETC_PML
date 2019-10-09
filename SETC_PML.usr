@@ -255,8 +255,8 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
      & , sux2_2d_o(ly1,lz1,lely,lelz,12)
 
       logical ifverbose
-      common /gaaa/    wo1(lx1,ly1,lz1,lelv)
-     &              ,  wo2(lx1,ly1,lz1,lelv)
+      real   wo1(lx1,ly1,lz1,lelv)
+     &      ,  wo2(lx1,ly1,lz1,lelv)
      
 
       real             w1(ly1,lz1,lely,lelz)
@@ -319,7 +319,30 @@ c     tke production and dissipation computation
      $     tz(lx1,ly1,lz1,lelv)
 
 c     ############################################################
-c
+C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
+      parameter(mz=lz1*lelz*2)
+      parameter(myint=ly1*lely*10)
+      parameter(INTP_NMAX=mz*myint)
+      parameter(INTP_NMAX2=INTP_NMAX*2)
+
+      real    rwk(INTP_NMAX,ldim+1) ! r, s, t, dist2
+      integer iwk(INTP_NMAX,3)      ! code, proc, el 
+      save    rwk, iwk
+
+      integer nint, intp_h, intp_h2
+      save    nint, intp_h, intp_h2
+
+      logical iffpts
+      save iffpts
+
+      real xint(INTP_NMAX),yint(INTP_NMAX),zint(INTP_NMAX)
+      save xint, yint, zint
+      real wintr(INTP_NMAX),wintr2(INTP_NMAX2)
+      save wintr
+      real ymm(ly1,lz1,lely,lelz), zmm(ly1,lz1,lely,lelz),tline(myint),
+     &     xint2(ly1,lz1,lely,lelz)
+      real deltaz ,zdum
+C       real zline(mz),wzline(lz1,lelz),wzl2(lz1,lelz),wzl3(lz1,lelz)
 c     ############################################################
 c     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lely)
@@ -394,6 +417,18 @@ c     OUTPUT INITIAL CONDITION
 
 c     ############################################################
 c
+C       call z_line(wzline,zm1,wzl2,wzl3)
+C       do i=1,mz
+C           zline(i)=wzline(i,1)
+C       enddo
+C       if (istep.eq.0) then 
+C         call x_slice(ymm,ym1,w1,w2)
+C         do i=1,myint
+C           yline(i)=ymm(i,1,1,1)
+C         enddo
+C         call HPSORT(myint,yline)
+C       endif
+
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
         call rzero(ru2m,size(ru2m))
@@ -402,10 +437,35 @@ c
         call rzero(rux2,size(rux2))
         call gtpp_gs_setup(igs_x,nelx,nely,  nelz,1) ! x-avx
         call gtpp_gs_setup(igs_z,nelx*nely,1,nelz,3) ! z-avx
+        call interp_setup(intp_h,0.0,0,nelt)
+        call interp_setup(intp_h2,0.0,0,nelt) !is necessary?
+        call x_slice(ymm,ym1,w1,w2)
+        call x_slice(zmm,zm1,w1,w2)
+        if (nid.eq.0) then
+          nint = INTP_NMAX
+          call cfill(xint,1.0,size(xint))
+          call cfill(xint2,1.0,size(xint2))
+          do i=1,INTP_NMAX
+            j=i-int((i-1)/myint)*myint
+            yint(i)=(j-1.)*(YLEN)/(myint-1)
+C             yint(i)=yline(j)
+            j=int((i-1)/myint)+1
+C             zint(i)=zline(j)
+            zint(i)=(j-1.)*(ZLEN)/(mz-1)
+          enddo
+          deltaz=zint(myint+1)-zint(1)
+        endif
+        iffpts = .true. ! dummy call to find points
+        call interp_nfld(wintr,wo1,1,xint,yint,zint,nint,
+     $                   iwk,rwk,INTP_NMAX,iffpts,intp_h)
+        call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
+     $                   iwk,rwk,m,iffpts,intp_h2)
+        iffpts = .false.
         atime = 0.
         timel = time
         icalled = 1
       endif !(icalled.eq.0)
+      write(*,*)'pato'
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -552,10 +612,58 @@ c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
 c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
 c
       mn=ny1*nely
-      call rzero(tempbar,mn)
+C       call rzero(tempbar,mn)
+C       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
+C       call planar_avg(wo2,wo1,igs_z)
+C       call y_line(tempbar,wo2,w1t,w2t)
+cccccccccccccccccccccc
+      call rzero(tempbar,mn) !wo1,2(lx1,ly1,lz1,lelv)
+      call cfill(wintr,151413121110987654321.,size(wintr))
+C       call rzero(wintr,INTP_NMAX)
+      call rzero(tline,myint)
       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-      call planar_avg(wo2,wo1,igs_z)
-      call y_line(tempbar,wo2,w1t,w2t)
+C       call planar_avg(wo2,wo1,igs_z)
+C       call y_line(tempbar,wo2,w1t,w2t)
+C       if(istep.eq.0)then
+      call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
+     $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
+
+      do i=1,myint
+        zdum=0.0
+        do j=1,mz
+          k=i+(j-1)*myint
+          if (wintr(k).ne.151413121110987654321.) then
+            tline(i)=tline(i)+wintr(k)*deltaz
+            zdum=zdum+deltaz
+          endif
+        enddo
+        tline(i)=tline(i)/zdum
+      enddo
+      do i=1,n
+        j=i-int(i/myint)*myint
+        wo1(i,1,1,1)=tline(j)
+      enddo
+      call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
+     $                   iwk,rwk,m,iffpts,intp_h2)
+C       do i=1, INTP_NMAX
+C         j=int(i/myint)+1
+C         tline(j)=tline(j)+wintr(i)*deltaz/(ZLEN)
+C       enddo
+
+
+
+      if(istep.eq.0.and.nid.eq.0)then
+      open(unit=57,file='test.dat',access='stream',form='unformatted')
+       write(57) INTP_NMAX, mz, yint, zint, wintr,tline
+
+C       do i=1,lely
+C         do j=1,ly1
+C          write(57,*) tempbar(j,i)
+C          enddo
+C        enddo
+      close(57)
+       endif
+
 c
 c     ############################################################
 
@@ -619,6 +727,11 @@ c-----------------------------------------------------------------------
       uz = 0.0
       temp = 0.0
 
+C       if (y.lt.2) temp=3.0
+C       if (y.ge.2 .and. y.le.4) temp=2.0
+C       if (y.gt.4) temp=1.0
+      temp=2*y
+
       return
       end
 c-----------------------------------------------------------------------
@@ -636,6 +749,8 @@ c-----------------------------------------------------------------------
       zh=(ZLEN)/2.0
       A1=zh/RITAU   !zh*tan(theta)
       A2=zh/RITAU2
+C       A1=0
+C       A2=0
       n=8*nelt
 c
       nelytot = NUMBER_ELEMENTS_Y
@@ -997,7 +1112,44 @@ c
 
       return
       end
+c---------------------------------------------------------------------      
+C       subroutine z_line (ua,u,w1,w2)
+C c
+C c     Extract a z line of quantity u() - assumes global tens.prod.
+C c
+C       include 'SIZE'
+C       include 'GEOM'
+C       include 'PARALLEL'
+C       include 'WZ'
+C       include 'ZPER'
+C c
+C       real ua(nz1,nelz),u(nx1,ny1,nz1,nelv)
+C       real w1(nz1,nelz),w2(nz1,nelz)
+C       integer e,eg,ex,ey,ez
+C       real dy2
+C c
+C       mz = nelz*nz1
+C       call rzero(ua,mz)
+C       call rzero(w1,mz)
+C       call rzero(w2,mz)
+C c
+C       do e=1,nelt
+C c
+C          eg = lglel(e)
+C          call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+C          i = 1
+C          j = 1
+C          if (ex.eq.1 .and. ey.eq.1) then
+C             do k=1,nz1
+C                ua(k,ez) = u(i,j,k,e)
+C             enddo
+C          endif
+C       enddo
 
+C       call gop(ua,w2,'+  ',mz)
+ 
+C       return
+C       end
 
 c     ############################################################
       subroutine output_inflow_pl(vxin_pl,vyin_pl,vzin_pl,tin_pl
@@ -1385,3 +1537,41 @@ c
       return
       end
 
+      SUBROUTINE HPSORT(N,RA)
+        real RA(N)
+        L=N/2+1
+        IR=N
+        !The index L will be decremented from its initial value during the
+        !"hiring" (heap creation) phase. Once it reaches 1, the index IR 
+        !will be decremented from its initial value down to 1 during the
+        !"retirement-and-promotion" (heap selection) phase.
+   10 continue
+        if(L > 1)then
+          L=L-1
+          RRA=RA(L)
+        else
+          RRA=RA(IR)
+          RA(IR)=RA(1)
+          IR=IR-1
+          if(IR.eq.1)then
+            RA(1)=RRA
+            return
+          end if
+        end if
+        I=L
+        J=L+L
+   20 if(J.le.IR)then
+        if(J < IR)then
+          if(RA(J) < RA(J+1))  J=J+1
+        end if
+        if(RRA < RA(J))then
+          RA(I)=RA(J)
+          I=J; J=J+J
+        else
+          J=IR+1
+        end if
+        goto 20
+        end if
+        RA(I)=RRA
+        goto 10
+      END
