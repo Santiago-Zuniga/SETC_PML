@@ -68,19 +68,26 @@ c-----------------------------------------------------------------------
 
 
       real*8 egrav(3)
-
-c     HYDROSTATIC PRESSURE VARIABLES
-      common /TBAR/ tempbar(ly1,lely)
-     &             ,w1t(ly1,lely)
-     &             ,w2t(ly1,lely)
-c
+C     HYDROSTATIC PRESSURE VARIABLES
+      common /TBAR/ tempbar(ly1,lz1,lely,lelz)
+C 
       integer ex,ey,ez
 
 c     BUFFER ZONE VARIABLES
       real*8 sigma2(3),sigmam1(3),sigmam2(3),beta,ybuff  !changed sigma to sigma2
      $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
+      integer if_pml
+      save if_pml
 
-c     MESH VARIABLES
+      if (istep.eq.0)then
+       if (UTARGET.lt.0.)then
+        if_pml=0
+       else
+        if_pml=1
+       endif
+      endif
+
+c     MESH VARIABLES 
       egrav(1) = 0.0                         !x: Spanwise direction
       egrav(2) = -1.0*sqrt(1+RITAU**2)       !y: Wall-normal direction
       egrav(3) = 0.0                         !z: Streamwise direction
@@ -88,54 +95,53 @@ c     MESH VARIABLES
 c     Note: this is an acceleration term, NOT a force!
 c     Thus, ffx will subsequently be multiplied by rho(x,t).
       call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-
       ffx = temp*egrav(1)
-C       ffy = (temp - tempbar(iy,ey))*egrav(2)
-      ffy = temp*egrav(2)
+      ffy = (temp - tempbar(iy,iz,ey,ez))*egrav(2)
+C       ffy = temp*egrav(2)
       ffz = temp*egrav(3)
 c     ############################################################
 c     ############################################################
 
 c     ############################################################
 c     ############################################################
+      if (if_pml.eq.1)then
 c     Buffer zones
-      sigmam1(1) = 0.0                          !<-----------------CHANGE!
-      sigmam1(2) = 1.0                          !<-----------------CHANGE!
-      sigmam1(3) = 0.0                          !<-----------------CHANGE!
+        sigmam1(1) = 0.0                          !<-----------------CHANGE!
+        sigmam1(2) = 1.0                          !<-----------------CHANGE!
+        sigmam1(3) = 0.0                          !<-----------------CHANGE!
 
-      sigmam2(1) = 0.0                          !<-----------------CHANGE!
-      sigmam2(2) = 0.0                          !<-----------------CHANGE!
-      sigmam2(3) = 0.0                          !<-----------------CHANGE!
+        sigmam2(1) = 0.0                          !<-----------------CHANGE!
+        sigmam2(2) = 0.0                          !<-----------------CHANGE!
+        sigmam2(3) = 0.0                          !<-----------------CHANGE!
 
-      beta = 2.0                                !<-----------------CHANGE!
+        beta = 2.0                                !<-----------------CHANGE!
 
-      umean1(1) = 0.0                           !<-----------------CHANGE! 
-      umean1(2) =-UTARGET                       
-      umean1(3) = 0.0                           !<-----------------CHANGE! 
-      
-      umean2(1) = 0.0                           !<-----------------CHANGE! 
-      umean2(2) = 0.0                           !<-----------------CHANGE! 
-      umean2(3) = 0.0                           !<-----------------CHANGE! 
+        umean1(1) = 0.0                           !<-----------------CHANGE! 
+        umean1(2) =-UTARGET                       
+        umean1(3) = 0.0                           !<-----------------CHANGE! 
+        
+        umean2(1) = 0.0                           !<-----------------CHANGE! 
+        umean2(2) = 0.0                           !<-----------------CHANGE! 
+        umean2(3) = 0.0                           !<-----------------CHANGE! 
 
-      m=(YLEN-YBUFF)/(ZLEN-ZBUFF)
-      zz = (y-YBUFF)/m + ZBUFF
-      yy = m * (z-ZBUFF) + YBUFF
+        m=(YLEN-YBUFF)/(ZLEN-ZBUFF)
+        zz = (y-YBUFF)/m + ZBUFF
+        yy = m * (z-ZBUFF) + YBUFF
 
 c     ###############
 c     Top buffer zone
-      sigma2(1) = 0.0
-      sigma2(2) = 0.0
-      sigma2(3) = 0.0
-      if (y.ge.YBUFF.and.z.le.zz) then
-        sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma2(1) = 0.0
+        sigma2(2) = 0.0
+        sigma2(3) = 0.0
+        if (y.ge.YBUFF.and.z.le.zz) then
+          sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+          sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+          sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
 
-        ffx = ffx - sigma2(1) * (ux - umean1(1))
-        ffy = ffy - sigma2(2) * (uy - umean1(2)) 
-        ffz = ffz - sigma2(3) * (uz - umean1(3))
-      endif
-
+          ffx = ffx - sigma2(1) * (ux - umean1(1))
+          ffy = ffy - sigma2(2) * (uy - umean1(2)) 
+          ffz = ffz - sigma2(3) * (uz - umean1(3))
+        endif
 c     ###################
 c     Outflow buffer zone
 C       if(.FALSE.) then
@@ -155,6 +161,9 @@ C             ffz = ffz - sigma2(3) * (uz - umean2(3))
 C           endif
 C       endif
 c     ####################
+      endif
+
+
       return
       end
 c-----------------------------------------------------------------------
@@ -320,10 +329,9 @@ c     tke production and dissipation computation
 
 c     ############################################################
 C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
-      parameter(mz=lz1*lelz*2)
-      parameter(myint=ly1*lely*10)
+      parameter(mz=lz1*lelz*3)
+      parameter(myint=ly1*lely*3)
       parameter(INTP_NMAX=mz*myint)
-      parameter(INTP_NMAX2=INTP_NMAX*2)
 
       real    rwk(INTP_NMAX,ldim+1) ! r, s, t, dist2
       integer iwk(INTP_NMAX,3)      ! code, proc, el 
@@ -337,17 +345,21 @@ C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
 
       real xint(INTP_NMAX),yint(INTP_NMAX),zint(INTP_NMAX)
       save xint, yint, zint
-      real wintr(INTP_NMAX),wintr2(INTP_NMAX2)
+      real wintr(INTP_NMAX)
       save wintr
-      real ymm(ly1,lz1,lely,lelz), zmm(ly1,lz1,lely,lelz),tline(myint),
-     &     xint2(ly1,lz1,lely,lelz)
+      real ymm(ly1,lz1,lely,lelz)
+      save ymm
       real deltaz ,zdum
-C       real zline(mz),wzline(lz1,lelz),wzl2(lz1,lelz),wzl3(lz1,lelz)
+      save deltaz,zdum
+      real  wintr3(myint), wintr2(myint)
+      save wintr3,wintr2
+      real y_inter(myint), tline(myint)
+      save y_inter,tline
 c     ############################################################
 c     HYDROSTATIC PRESSURE VARIABLES
-      common /TBAR/ tempbar(ly1,lely)
-     $             ,w1t(ly1,lely)
-     $             ,w2t(ly1,lely)
+      common /TBAR/ tempbar(ly1,lz1,lely,lelz)
+      
+
 
       parameter (llt=lx1*ly1*lz1*lelt)
       common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
@@ -416,19 +428,9 @@ c     OUTPUT INITIAL CONDITION
       endif
 
 c     ############################################################
-c
-C       call z_line(wzline,zm1,wzl2,wzl3)
-C       do i=1,mz
-C           zline(i)=wzline(i,1)
-C       enddo
-C       if (istep.eq.0) then 
-C         call x_slice(ymm,ym1,w1,w2)
-C         do i=1,myint
-C           yline(i)=ymm(i,1,1,1)
-C         enddo
-C         call HPSORT(myint,yline)
-C       endif
-
+      if (istep.eq.0) then 
+        call x_slice(ymm,ym1,w1,w2)
+      endif
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
         call rzero(ru2m,size(ru2m))
@@ -438,34 +440,28 @@ C       endif
         call gtpp_gs_setup(igs_x,nelx,nely,  nelz,1) ! x-avx
         call gtpp_gs_setup(igs_z,nelx*nely,1,nelz,3) ! z-avx
         call interp_setup(intp_h,0.0,0,nelt)
-        call interp_setup(intp_h2,0.0,0,nelt) !is necessary?
-        call x_slice(ymm,ym1,w1,w2)
-        call x_slice(zmm,zm1,w1,w2)
         if (nid.eq.0) then
           nint = INTP_NMAX
           call cfill(xint,1.0,size(xint))
-          call cfill(xint2,1.0,size(xint2))
-          do i=1,INTP_NMAX
-            j=i-int((i-1)/myint)*myint
-            yint(i)=(j-1.)*(YLEN)/(myint-1)
-C             yint(i)=yline(j)
-            j=int((i-1)/myint)+1
-C             zint(i)=zline(j)
-            zint(i)=(j-1.)*(ZLEN)/(mz-1)
-          enddo
-          deltaz=zint(myint+1)-zint(1)
         endif
+        do i=1,INTP_NMAX
+            j=i-int((i-1)/myint)*myint
+            yint(i)=(j-1.)*1./(myint-1)
+            yint(i)=tanh(2.5*(yint(i)-1.))/tanh(2.5)+1.
+            yint(i)=yint(i)*YLEN
+            if (i.le.myint) y_inter(i)=yint(i)
+            j=int((i-1)/myint)+1
+            zint(i)=(j-1.)*(ZLEN)/(mz-1)
+        enddo
+        deltaz=zint(myint+1)-zint(1)
         iffpts = .true. ! dummy call to find points
-        call interp_nfld(wintr,wo1,1,xint,yint,zint,nint,
+         call interp_nfld(wintr,wo1,1,xint,yint,zint,nint,
      $                   iwk,rwk,INTP_NMAX,iffpts,intp_h)
-        call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
-     $                   iwk,rwk,m,iffpts,intp_h2)
         iffpts = .false.
         atime = 0.
         timel = time
         icalled = 1
       endif !(icalled.eq.0)
-      write(*,*)'pato'
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -610,61 +606,34 @@ c     write 2d fld spanwise-averaged files
 c     ############################################################
 c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
 c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
-c
-      mn=ny1*nely
-C       call rzero(tempbar,mn)
-C       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-C       call planar_avg(wo2,wo1,igs_z)
-C       call y_line(tempbar,wo2,w1t,w2t)
-cccccccccccccccccccccc
-      call rzero(tempbar,mn) !wo1,2(lx1,ly1,lz1,lelv)
+      call rzero(tempbar,m) !wo1,2(lx1,ly1,lz1,lelv)
       call cfill(wintr,151413121110987654321.,size(wintr))
-C       call rzero(wintr,INTP_NMAX)
       call rzero(tline,myint)
       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-C       call planar_avg(wo2,wo1,igs_z)
-C       call y_line(tempbar,wo2,w1t,w2t)
-C       if(istep.eq.0)then
+
       call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
      $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
-
-      do i=1,myint
-        zdum=0.0
-        do j=1,mz
-          k=i+(j-1)*myint
-          if (wintr(k).ne.151413121110987654321.) then
-            tline(i)=tline(i)+wintr(k)*deltaz
-            zdum=zdum+deltaz
-          endif
+      if(nid.eq.0) then
+        do i=1,myint
+          zdum=0.0
+          do j=1,mz
+              k=i+(j-1)*myint
+              if (wintr(k).ne.151413121110987654321.) then
+                tline(i)=tline(i)+wintr(k)*deltaz
+                zdum=zdum+deltaz
+              endif
+            enddo
+          tline(i)=tline(i)/zdum
         enddo
-        tline(i)=tline(i)/zdum
-      enddo
-      do i=1,n
-        j=i-int(i/myint)*myint
-        wo1(i,1,1,1)=tline(j)
-      enddo
-      call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
-     $                   iwk,rwk,m,iffpts,intp_h2)
-C       do i=1, INTP_NMAX
-C         j=int(i/myint)+1
-C         tline(j)=tline(j)+wintr(i)*deltaz/(ZLEN)
-C       enddo
+        call spline(y_inter,tline,myint,wintr2,wintr3)
+        do i=1,m
+          call splint(y_inter,tline,wintr2,myint,ymm(i,1,1,1),
+     $         tempbar(i,1,1,1))
+        enddo
+      endif
+      call rzero(w1,m)
+      call gop(tempbar,w1,'+  ',m)
 
-
-
-      if(istep.eq.0.and.nid.eq.0)then
-      open(unit=57,file='test.dat',access='stream',form='unformatted')
-       write(57) INTP_NMAX, mz, yint, zint, wintr,tline
-
-C       do i=1,lely
-C         do j=1,ly1
-C          write(57,*) tempbar(j,i)
-C          enddo
-C        enddo
-      close(57)
-       endif
-
-c
 c     ############################################################
 
       return
@@ -674,8 +643,7 @@ c-----------------------------------------------------------------------
       subroutine userbc (ix,iy,iz,iside,ieg)
 
       include 'SIZE'
-      include 'TSTEP'
-      include 'PARALLEL'
+      include 'TOTAL'
       include 'NEKUSE'
 
 c     ############################################################
@@ -687,31 +655,74 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
      $                  ,vzin_pl(lx1,ly1,nel_slab)
      $                  ,tin_pl(lx1,ly1,nel_slab)
 
-c     ############################################################
+      real ewfac
+      integer if_pml
+      save if_pml
 
+      if (istep.eq.0)then
+       if (UTARGET.lt.0.)then
+        if_pml=0
+       else
+        if_pml=1
+       endif
+      endif
 
-c     ############################################################
-c     ############################################################
-c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       ux   = 0.
       uy   = 0.
       uz   = 0.
       temp = 0.
+c     ############################################################
+c     ############################################################
+c     INFLOW FROM INTERPOLATED EXTERNAL FILE
 
-      if (ifield .eq. 1) then               ! velocity
-        if(ieg.le.nel_slab.and.iside.eq.5) then
-          ux  = vxin_pl(ix,iy,ieg)
-          uy  = vyin_pl(ix,iy,ieg)
-          uz  = vzin_pl(ix,iy,ieg)
+      if (if_pml.eq.1) then
+        if (ifield .eq. 1) then               ! velocity
+          if(ieg.le.nel_slab.and.iside.eq.5) then
+            ux  = vxin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)
+            uz  = vzin_pl(ix,iy,ieg)
+          endif
+        elseif (ifield .eq. 2) then     !temperature
+          temp = 0.0
+          if (ieg.le.nel_slab.and.iside.eq.5) then  
+            temp  = tin_pl(ix,iy,ieg)
+          endif
         endif
-      elseif (ifield .eq. 2) then     !temperature
-        temp = 0.0
-        if (ieg.le.nel_slab.and.iside.eq.5) then  
-          temp  = tin_pl(ix,iy,ieg)
+      else
+        ewfac = -1.0*UTARGET          
+        zstart = 0                    !<----------------------CHANGE
+        zstart1 = zstart + 1.         !<----------------------CHANGE
+        zend = ZLEN
+        zend1 = zend - 1.             !<----------------------CHANGE
+
+        if (ifield .eq. 1) then               ! velocity
+          if (iside.eq.3) then
+              ux = 0.0
+c           This coflow is only for the top wall of the domain
+              if (z.ge.zstart.and.z.le.zstart1) then
+                uy= ((z-zstart-1.)**8 - 1.)*ewfac
+              elseif (z.ge.zstart1.and.z.le.zend1) then
+                uy= (-1)*ewfac
+              elseif (z.ge.zend1.and.z.le.zend) then
+                uy= ((z-zend+1.)**8 - 1.)*ewfac
+              endif
+              uz = 0.0
+
+          elseif(ieg.le.nel_slab.and.iside.eq.5) then
+            ux  = vxin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)
+            uz  = vzin_pl(ix,iy,ieg)
+          endif
+
+        elseif (ifield .eq. 2) then     !temperature
+          temp = 0.0
+          if (ieg.le.nel_slab.and.iside.eq.5) then
+            temp  = tin_pl(ix,iy,ieg)
+          endif
         endif
       endif
 c     ############################################################
-c     ############################################################
+c     #########################################################
 
       return
       end
@@ -730,7 +741,7 @@ c-----------------------------------------------------------------------
 C       if (y.lt.2) temp=3.0
 C       if (y.ge.2 .and. y.le.4) temp=2.0
 C       if (y.gt.4) temp=1.0
-      temp=2*y
+      temp=2*(y+1)**0.5
 
       return
       end
@@ -1537,41 +1548,62 @@ c
       return
       end
 
-      SUBROUTINE HPSORT(N,RA)
-        real RA(N)
-        L=N/2+1
-        IR=N
-        !The index L will be decremented from its initial value during the
-        !"hiring" (heap creation) phase. Once it reaches 1, the index IR 
-        !will be decremented from its initial value down to 1 during the
-        !"retirement-and-promotion" (heap selection) phase.
-   10 continue
-        if(L > 1)then
-          L=L-1
-          RRA=RA(L)
-        else
-          RRA=RA(IR)
-          RA(IR)=RA(1)
-          IR=IR-1
-          if(IR.eq.1)then
-            RA(1)=RRA
-            return
-          end if
-        end if
-        I=L
-        J=L+L
-   20 if(J.le.IR)then
-        if(J < IR)then
-          if(RA(J) < RA(J+1))  J=J+1
-        end if
-        if(RRA < RA(J))then
-          RA(I)=RA(J)
-          I=J; J=J+J
-        else
-          J=IR+1
-        end if
-        goto 20
-        end if
-        RA(I)=RRA
-        goto 10
-      END
+      subroutine spline(x,y,n,y2,u)
+C       parameter (nmax=10000000)
+C       dimension x(n),y(n),y2(n),u(n)
+      real x(n),y(n),y2(n),u(n)
+C       if (n.gt.nmax) then
+C          write(6,11) n,nmax
+C    11    FORMAT(2X,'ERROR:  Attempt to fit a spline with',I5
+C      $            ,'greater than',I4,' points.'
+C      $       ,/,2X,'Recompile routine SPLINE.')
+C          call exitti('routine spline fail$',n)
+C       endif
+      y2(1)=0.0
+      u(1) =0.0
+      do i=2,n-1
+         ir=i+1
+         il=i-1
+         sig=(x(i)-x(il))/(x(ir)-x(il))
+         p=sig*y2(il)+2.
+         y2(i)=(sig-1.)/p
+         u(i)= ( 6.*
+     $     ( (y(ir)-y(i))/(x(ir)-x(i))-(y(i)-y(il))/ (x(i)-x(il) ) )
+     $            / (x(ir)-x(il))
+     $    - sig*u(il) )/p
+      enddo
+      qn=0.0
+      un=0.0
+      y2(n)=(un-qn*u(n-1))/(qn*y2(n-1)+1.)
+      do k=n-1,1,-1
+         y2(k)=y2(k)*y2(k+1)+u(k)
+      enddo
+      return
+      end
+
+      subroutine splint(xa,ya,y2a,n,x,y)
+c     p. 88-89, numerical recipes
+      real xa(n),ya(n),y2a(n)
+      klo=1
+      khi=n
+    1   if ((khi-klo).gt.1) then
+           k=(khi+klo)/2
+           if (xa(k).gt.x) then
+              khi=k
+           else
+              klo=k
+           endif
+           goto 1
+        endif
+      h=xa(khi)-xa(klo)
+      if (h.eq.0) then
+C          write(6,*) xa(khi), 'splint failure',khi
+          y=0.0
+         return
+      endif
+      a=(xa(khi)-x)/h
+      b=(x-xa(klo))/h
+      y=a*ya(klo)+b*ya(khi)+
+     $  ((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.
+      return
+      end
