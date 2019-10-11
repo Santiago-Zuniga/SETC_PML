@@ -68,11 +68,6 @@ c-----------------------------------------------------------------------
 
 
       real*8 egrav(3)
-C       parameter(mz=lz1*lelz*5)
-C       parameter(myint=ly1*lely*10)
-C       parameter(INTP_NMAX=mz*myint)
-C       parameter(mdum=ly1*lz1*lely*lelz)
-
 C     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lz1,lely,lelz)
 C 
@@ -147,7 +142,6 @@ c     Top buffer zone
           ffy = ffy - sigma2(2) * (uy - umean1(2)) 
           ffz = ffz - sigma2(3) * (uz - umean1(3))
         endif
-        if(nid.eq.0.and.istep.gt.0)write(*,*)'pato',UTARGET,istep
 c     ###################
 c     Outflow buffer zone
 C       if(.FALSE.) then
@@ -335,10 +329,9 @@ c     tke production and dissipation computation
 
 c     ############################################################
 C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
-      parameter(mz=lz1*lelz*5)
-      parameter(myint=ly1*lely*10)
+      parameter(mz=lz1*lelz*3)
+      parameter(myint=ly1*lely*3)
       parameter(INTP_NMAX=mz*myint)
-      parameter(mdum=ly1*lz1*lely*lelz)
 
       real    rwk(INTP_NMAX,ldim+1) ! r, s, t, dist2
       integer iwk(INTP_NMAX,3)      ! code, proc, el 
@@ -360,12 +353,8 @@ C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
       save deltaz,zdum
       real  wintr3(myint), wintr2(myint)
       save wintr3,wintr2
-C       real yline(mdum), tline_in(mdum)
       real y_inter(myint), tline(myint)
       save y_inter,tline
-
-
-C       save yline, tline_in, y_inter, tline
 c     ############################################################
 c     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lz1,lely,lelz)
@@ -439,19 +428,9 @@ c     OUTPUT INITIAL CONDITION
       endif
 
 c     ############################################################
-c
-C       call z_line(wzline,zm1,wzl2,wzl3)
-C       do i=1,mz
-C           zline(i)=wzline(i,1)
-C       enddo
       if (istep.eq.0) then 
         call x_slice(ymm,ym1,w1,w2)
-C         do i=1,m
-C           yline(i)=ymm(i,1,1,1)
-C         enddo
-C         call HPSORT(m,yline)
       endif
-
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
         call rzero(ru2m,size(ru2m))
@@ -467,11 +446,11 @@ C         call HPSORT(m,yline)
         endif
         do i=1,INTP_NMAX
             j=i-int((i-1)/myint)*myint
-            yint(i)=(j-1.)*(YLEN)/(myint-1)
+            yint(i)=(j-1.)*1./(myint-1)
+            yint(i)=tanh(2.5*(yint(i)-1.))/tanh(2.5)+1.
+            yint(i)=yint(i)*YLEN
             if (i.le.myint) y_inter(i)=yint(i)
-C             yint(i)=yline(j)
             j=int((i-1)/myint)+1
-C             zint(i)=zline(j)
             zint(i)=(j-1.)*(ZLEN)/(mz-1)
         enddo
         deltaz=zint(myint+1)-zint(1)
@@ -627,13 +606,6 @@ c     write 2d fld spanwise-averaged files
 c     ############################################################
 c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
 c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
-c
-      mn=ny1*nely
-C       call rzero(tempbar,mn)
-C       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-C       call planar_avg(wo2,wo1,igs_z)
-C       call y_line(tempbar,wo2,w1t,w2t)
-cccccccccccccccccccccc
       call rzero(tempbar,m) !wo1,2(lx1,ly1,lz1,lelv)
       call cfill(wintr,151413121110987654321.,size(wintr))
       call rzero(tline,myint)
@@ -642,37 +614,26 @@ cccccccccccccccccccccc
       call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
      $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
       if(nid.eq.0) then
-      do i=1,myint
-        zdum=0.0
-        do j=1,mz
-          k=i+(j-1)*myint
-          if (wintr(k).ne.151413121110987654321.) then
-            tline(i)=tline(i)+wintr(k)*deltaz
-            zdum=zdum+deltaz
-          endif
+        do i=1,myint
+          zdum=0.0
+          do j=1,mz
+              k=i+(j-1)*myint
+              if (wintr(k).ne.151413121110987654321.) then
+                tline(i)=tline(i)+wintr(k)*deltaz
+                zdum=zdum+deltaz
+              endif
+            enddo
+          tline(i)=tline(i)/zdum
         enddo
-        tline(i)=tline(i)/zdum
-      enddo
-      call spline(y_inter,tline,myint,wintr2,wintr3)
-      do i=1,m
-        call splint(y_inter,tline,wintr2,myint,ymm(i,1,1,1),
-     $    tempbar(i,1,1,1))
-      enddo
+        call spline(y_inter,tline,myint,wintr2,wintr3)
+        do i=1,m
+          call splint(y_inter,tline,wintr2,myint,ymm(i,1,1,1),
+     $         tempbar(i,1,1,1))
+        enddo
       endif
       call rzero(w1,m)
       call gop(tempbar,w1,'+  ',m)
 
-C       write(*,*)'pato',nid,y_inter(99),wintr2(100),tline(100)
-C       if(istep.eq.0)then
-C          write(icfile,2) nid
-C     2       format('testt',i2.2)
-C       open(unit=57,file=icfile,access='stream',form='unformatted')
-C C        write(57) INTP_NMAX, mz, yint, zint, wintr,tline
-C         write(57)ly1,lz1,lely,lelz
-C         write(57)tempbar
-C       close(57)
-C        endif
-c
 c     ############################################################
 
       return
@@ -1586,45 +1547,6 @@ c
 
       return
       end
-
-      SUBROUTINE HPSORT(N,RA)
-        real RA(N)
-        L=N/2+1
-        IR=N
-        !The index L will be decremented from its initial value during the
-        !"hiring" (heap creation) phase. Once it reaches 1, the index IR 
-        !will be decremented from its initial value down to 1 during the
-        !"retirement-and-promotion" (heap selection) phase.
-   10 continue
-        if(L > 1)then
-          L=L-1
-          RRA=RA(L)
-        else
-          RRA=RA(IR)
-          RA(IR)=RA(1)
-          IR=IR-1
-          if(IR.eq.1)then
-            RA(1)=RRA
-            return
-          end if
-        end if
-        I=L
-        J=L+L
-   20 if(J.le.IR)then
-        if(J < IR)then
-          if(RA(J) < RA(J+1))  J=J+1
-        end if
-        if(RRA < RA(J))then
-          RA(I)=RA(J)
-          I=J; J=J+J
-        else
-          J=IR+1
-        end if
-        goto 20
-        end if
-        RA(I)=RRA
-        goto 10
-      END
 
       subroutine spline(x,y,n,y2,u)
 C       parameter (nmax=10000000)
