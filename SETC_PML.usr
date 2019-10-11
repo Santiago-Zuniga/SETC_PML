@@ -73,20 +73,24 @@ C       parameter(myint=ly1*lely*10)
 C       parameter(INTP_NMAX=mz*myint)
 C       parameter(mdum=ly1*lz1*lely*lelz)
 
-C c     HYDROSTATIC PRESSURE VARIABLES
+C     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lz1,lely,lelz)
-C      $             ,w1t(ly1,lely)
-C      $             ,w2t(ly1,lely), wintr2(myint),
-C      $         yline(mdum), tline_in(mdum), y_inter(myint), tline(myint)
-C c
+C 
       integer ex,ey,ez
 
 c     BUFFER ZONE VARIABLES
       real*8 sigma2(3),sigmam1(3),sigmam2(3),beta,ybuff  !changed sigma to sigma2
      $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
-      real ydum, tdum
+      integer if_pml
+      save if_pml
 
-C       if (istep.eq.0) call rzero(tempbar,size(tempbar))
+      if (istep.eq.0)then
+       if (UTARGET.lt.0.)then
+        if_pml=0
+       else
+        if_pml=1
+       endif
+      endif
 
 c     MESH VARIABLES 
       egrav(1) = 0.0                         !x: Spanwise direction
@@ -97,7 +101,6 @@ c     Note: this is an acceleration term, NOT a force!
 c     Thus, ffx will subsequently be multiplied by rho(x,t).
       call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
       ffx = temp*egrav(1)
-C       if(istep .eq.3.and.y.le.2.0) write(*,*)'pato',tempbar(iy,iz,ey,ez)
       ffy = (temp - tempbar(iy,iz,ey,ez))*egrav(2)
 C       ffy = temp*egrav(2)
       ffz = temp*egrav(3)
@@ -106,44 +109,45 @@ c     ############################################################
 
 c     ############################################################
 c     ############################################################
+      if (if_pml.eq.1)then
 c     Buffer zones
-      sigmam1(1) = 0.0                          !<-----------------CHANGE!
-      sigmam1(2) = 1.0                          !<-----------------CHANGE!
-      sigmam1(3) = 0.0                          !<-----------------CHANGE!
+        sigmam1(1) = 0.0                          !<-----------------CHANGE!
+        sigmam1(2) = 1.0                          !<-----------------CHANGE!
+        sigmam1(3) = 0.0                          !<-----------------CHANGE!
 
-      sigmam2(1) = 0.0                          !<-----------------CHANGE!
-      sigmam2(2) = 0.0                          !<-----------------CHANGE!
-      sigmam2(3) = 0.0                          !<-----------------CHANGE!
+        sigmam2(1) = 0.0                          !<-----------------CHANGE!
+        sigmam2(2) = 0.0                          !<-----------------CHANGE!
+        sigmam2(3) = 0.0                          !<-----------------CHANGE!
 
-      beta = 2.0                                !<-----------------CHANGE!
+        beta = 2.0                                !<-----------------CHANGE!
 
-      umean1(1) = 0.0                           !<-----------------CHANGE! 
-      umean1(2) =-UTARGET                       
-      umean1(3) = 0.0                           !<-----------------CHANGE! 
-      
-      umean2(1) = 0.0                           !<-----------------CHANGE! 
-      umean2(2) = 0.0                           !<-----------------CHANGE! 
-      umean2(3) = 0.0                           !<-----------------CHANGE! 
+        umean1(1) = 0.0                           !<-----------------CHANGE! 
+        umean1(2) =-UTARGET                       
+        umean1(3) = 0.0                           !<-----------------CHANGE! 
+        
+        umean2(1) = 0.0                           !<-----------------CHANGE! 
+        umean2(2) = 0.0                           !<-----------------CHANGE! 
+        umean2(3) = 0.0                           !<-----------------CHANGE! 
 
-      m=(YLEN-YBUFF)/(ZLEN-ZBUFF)
-      zz = (y-YBUFF)/m + ZBUFF
-      yy = m * (z-ZBUFF) + YBUFF
+        m=(YLEN-YBUFF)/(ZLEN-ZBUFF)
+        zz = (y-YBUFF)/m + ZBUFF
+        yy = m * (z-ZBUFF) + YBUFF
 
 c     ###############
 c     Top buffer zone
-      sigma2(1) = 0.0
-      sigma2(2) = 0.0
-      sigma2(3) = 0.0
-      if (y.ge.YBUFF.and.z.le.zz) then
-        sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-        sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+        sigma2(1) = 0.0
+        sigma2(2) = 0.0
+        sigma2(3) = 0.0
+        if (y.ge.YBUFF.and.z.le.zz) then
+          sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+          sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+          sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
 
-        ffx = ffx - sigma2(1) * (ux - umean1(1))
-        ffy = ffy - sigma2(2) * (uy - umean1(2)) 
-        ffz = ffz - sigma2(3) * (uz - umean1(3))
-      endif
-
+          ffx = ffx - sigma2(1) * (ux - umean1(1))
+          ffy = ffy - sigma2(2) * (uy - umean1(2)) 
+          ffz = ffz - sigma2(3) * (uz - umean1(3))
+        endif
+        if(nid.eq.0.and.istep.gt.0)write(*,*)'pato',UTARGET,istep
 c     ###################
 c     Outflow buffer zone
 C       if(.FALSE.) then
@@ -163,6 +167,9 @@ C             ffz = ffz - sigma2(3) * (uz - umean2(3))
 C           endif
 C       endif
 c     ####################
+      endif
+
+
       return
       end
 c-----------------------------------------------------------------------
@@ -675,8 +682,7 @@ c-----------------------------------------------------------------------
       subroutine userbc (ix,iy,iz,iside,ieg)
 
       include 'SIZE'
-      include 'TSTEP'
-      include 'PARALLEL'
+      include 'TOTAL'
       include 'NEKUSE'
 
 c     ############################################################
@@ -688,31 +694,74 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
      $                  ,vzin_pl(lx1,ly1,nel_slab)
      $                  ,tin_pl(lx1,ly1,nel_slab)
 
-c     ############################################################
+      real ewfac
+      integer if_pml
+      save if_pml
 
+      if (istep.eq.0)then
+       if (UTARGET.lt.0.)then
+        if_pml=0
+       else
+        if_pml=1
+       endif
+      endif
 
-c     ############################################################
-c     ############################################################
-c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       ux   = 0.
       uy   = 0.
       uz   = 0.
       temp = 0.
+c     ############################################################
+c     ############################################################
+c     INFLOW FROM INTERPOLATED EXTERNAL FILE
 
-      if (ifield .eq. 1) then               ! velocity
-        if(ieg.le.nel_slab.and.iside.eq.5) then
-          ux  = vxin_pl(ix,iy,ieg)
-          uy  = vyin_pl(ix,iy,ieg)
-          uz  = vzin_pl(ix,iy,ieg)
+      if (if_pml.eq.1) then
+        if (ifield .eq. 1) then               ! velocity
+          if(ieg.le.nel_slab.and.iside.eq.5) then
+            ux  = vxin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)
+            uz  = vzin_pl(ix,iy,ieg)
+          endif
+        elseif (ifield .eq. 2) then     !temperature
+          temp = 0.0
+          if (ieg.le.nel_slab.and.iside.eq.5) then  
+            temp  = tin_pl(ix,iy,ieg)
+          endif
         endif
-      elseif (ifield .eq. 2) then     !temperature
-        temp = 0.0
-        if (ieg.le.nel_slab.and.iside.eq.5) then  
-          temp  = tin_pl(ix,iy,ieg)
+      else
+        ewfac = -1.0*UTARGET          
+        zstart = 0                    !<----------------------CHANGE
+        zstart1 = zstart + 1.         !<----------------------CHANGE
+        zend = ZLEN
+        zend1 = zend - 1.             !<----------------------CHANGE
+
+        if (ifield .eq. 1) then               ! velocity
+          if (iside.eq.3) then
+              ux = 0.0
+c           This coflow is only for the top wall of the domain
+              if (z.ge.zstart.and.z.le.zstart1) then
+                uy= ((z-zstart-1.)**8 - 1.)*ewfac
+              elseif (z.ge.zstart1.and.z.le.zend1) then
+                uy= (-1)*ewfac
+              elseif (z.ge.zend1.and.z.le.zend) then
+                uy= ((z-zend+1.)**8 - 1.)*ewfac
+              endif
+              uz = 0.0
+
+          elseif(ieg.le.nel_slab.and.iside.eq.5) then
+            ux  = vxin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)
+            uz  = vzin_pl(ix,iy,ieg)
+          endif
+
+        elseif (ifield .eq. 2) then     !temperature
+          temp = 0.0
+          if (ieg.le.nel_slab.and.iside.eq.5) then
+            temp  = tin_pl(ix,iy,ieg)
+          endif
         endif
       endif
 c     ############################################################
-c     ############################################################
+c     #########################################################
 
       return
       end
