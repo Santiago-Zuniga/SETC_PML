@@ -68,25 +68,19 @@ c-----------------------------------------------------------------------
 
 
       real*8 egrav(3)
-      parameter(mz=lz1*lelz*5)
-      parameter(myint=ly1*lely*10)
-      parameter(INTP_NMAX=mz*myint)
-      parameter(mdum=ly1*lz1*lely*lelz)
 
 c     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lely)
-     $             ,w1t(ly1,lely)
-     $             ,w2t(ly1,lely), wintr2(myint),
-     $         yline(mdum), tline_in(mdum), y_inter(myint), tline(myint)
+     &             ,w1t(ly1,lely)
+     &             ,w2t(ly1,lely)
 c
       integer ex,ey,ez
 
 c     BUFFER ZONE VARIABLES
       real*8 sigma2(3),sigmam1(3),sigmam2(3),beta,ybuff  !changed sigma to sigma2
      $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
-      real ydum, tdum
 
-c     MESH VARIABLES 
+c     MESH VARIABLES
       egrav(1) = 0.0                         !x: Spanwise direction
       egrav(2) = -1.0*sqrt(1+RITAU**2)       !y: Wall-normal direction
       egrav(3) = 0.0                         !z: Streamwise direction
@@ -94,12 +88,9 @@ c     MESH VARIABLES
 c     Note: this is an acceleration term, NOT a force!
 c     Thus, ffx will subsequently be multiplied by rho(x,t).
       call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-      ffx = temp*egrav(1)
-      ydum=y
 
-      call splint(y_inter,tline,wintr2,myint,ydum,tdum)
-       write(*,*)'pato',y,tdum, myint, y_inter(100),wintr2(100)
-C       ffy = (temp - tdum)*egrav(2)
+      ffx = temp*egrav(1)
+C       ffy = (temp - tempbar(iy,ey))*egrav(2)
       ffy = temp*egrav(2)
       ffz = temp*egrav(3)
 c     ############################################################
@@ -329,10 +320,10 @@ c     tke production and dissipation computation
 
 c     ############################################################
 C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
-      parameter(mz=lz1*lelz*5)
+      parameter(mz=lz1*lelz*2)
       parameter(myint=ly1*lely*10)
       parameter(INTP_NMAX=mz*myint)
-      parameter(mdum=ly1*lz1*lely*lelz)
+      parameter(INTP_NMAX2=INTP_NMAX*2)
 
       real    rwk(INTP_NMAX,ldim+1) ! r, s, t, dist2
       integer iwk(INTP_NMAX,3)      ! code, proc, el 
@@ -346,20 +337,17 @@ C       parameter(INTP_NMAX=ly1*lz1*lely*lelz)
 
       real xint(INTP_NMAX),yint(INTP_NMAX),zint(INTP_NMAX)
       save xint, yint, zint
-      real wintr(INTP_NMAX)
+      real wintr(INTP_NMAX),wintr2(INTP_NMAX2)
       save wintr
-      real ymm(ly1,lz1,lely,lelz), zmm(ly1,lz1,lely,lelz),
+      real ymm(ly1,lz1,lely,lelz), zmm(ly1,lz1,lely,lelz),tline(myint),
      &     xint2(ly1,lz1,lely,lelz)
-      real deltaz ,zdum, wintr3(myint)
-C       real yline(mdum), tline_in(mdum), y_inter(myint), tline(myint)
-C       save yline, tline_in, y_inter, tline
+      real deltaz ,zdum
+C       real zline(mz),wzline(lz1,lelz),wzl2(lz1,lelz),wzl3(lz1,lelz)
 c     ############################################################
 c     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lely)
      $             ,w1t(ly1,lely)
-     $             ,w2t(ly1,lely), wintr2(myint),
-     $         yline(mdum), tline_in(mdum), y_inter(myint), tline(myint)
-
+     $             ,w2t(ly1,lely)
 
       parameter (llt=lx1*ly1*lz1*lelt)
       common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
@@ -433,13 +421,13 @@ C       call z_line(wzline,zm1,wzl2,wzl3)
 C       do i=1,mz
 C           zline(i)=wzline(i,1)
 C       enddo
-      if (istep.eq.0) then 
-        call x_slice(ymm,ym1,w1,w2)
-        do i=1,m
-          yline(i)=ymm(i,1,1,1)
-        enddo
-        call HPSORT(m,yline)
-      endif
+C       if (istep.eq.0) then 
+C         call x_slice(ymm,ym1,w1,w2)
+C         do i=1,myint
+C           yline(i)=ymm(i,1,1,1)
+C         enddo
+C         call HPSORT(myint,yline)
+C       endif
 
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
@@ -450,28 +438,34 @@ C       enddo
         call gtpp_gs_setup(igs_x,nelx,nely,  nelz,1) ! x-avx
         call gtpp_gs_setup(igs_z,nelx*nely,1,nelz,3) ! z-avx
         call interp_setup(intp_h,0.0,0,nelt)
+        call interp_setup(intp_h2,0.0,0,nelt) !is necessary?
+        call x_slice(ymm,ym1,w1,w2)
+        call x_slice(zmm,zm1,w1,w2)
         if (nid.eq.0) then
           nint = INTP_NMAX
           call cfill(xint,1.0,size(xint))
-        endif
-        do i=1,INTP_NMAX
+          call cfill(xint2,1.0,size(xint2))
+          do i=1,INTP_NMAX
             j=i-int((i-1)/myint)*myint
             yint(i)=(j-1.)*(YLEN)/(myint-1)
-            if (i.le.myint) y_inter(i)=yint(i)
 C             yint(i)=yline(j)
             j=int((i-1)/myint)+1
 C             zint(i)=zline(j)
             zint(i)=(j-1.)*(ZLEN)/(mz-1)
-        enddo
-        deltaz=zint(myint+1)-zint(1)
+          enddo
+          deltaz=zint(myint+1)-zint(1)
+        endif
         iffpts = .true. ! dummy call to find points
-         call interp_nfld(wintr,wo1,1,xint,yint,zint,nint,
+        call interp_nfld(wintr,wo1,1,xint,yint,zint,nint,
      $                   iwk,rwk,INTP_NMAX,iffpts,intp_h)
+        call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
+     $                   iwk,rwk,m,iffpts,intp_h2)
         iffpts = .false.
         atime = 0.
         timel = time
         icalled = 1
       endif !(icalled.eq.0)
+      write(*,*)'pato'
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
@@ -625,12 +619,15 @@ C       call y_line(tempbar,wo2,w1t,w2t)
 cccccccccccccccccccccc
       call rzero(tempbar,mn) !wo1,2(lx1,ly1,lz1,lelv)
       call cfill(wintr,151413121110987654321.,size(wintr))
+C       call rzero(wintr,INTP_NMAX)
       call rzero(tline,myint)
       call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-
+C       call planar_avg(wo2,wo1,igs_z)
+C       call y_line(tempbar,wo2,w1t,w2t)
+C       if(istep.eq.0)then
       call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
      $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
-      if (nid.eq.0)then
+
       do i=1,myint
         zdum=0.0
         do j=1,mz
@@ -642,21 +639,28 @@ cccccccccccccccccccccc
         enddo
         tline(i)=tline(i)/zdum
       enddo
-      endif
-      call gop(tline,wintr3,'+  ',myint) 
-C       call spline(y_inter,tline,myint,wintr2)
-C       call gop(wintr2,wintr3,'+  ',myint) 
-
-C       do i=1,m
-C         call splint(y_inter,tline,wintr2,myint,yline(i),tline_in(i))
+      do i=1,n
+        j=i-int(i/myint)*myint
+        wo1(i,1,1,1)=tline(j)
+      enddo
+      call interp_nfld(wo2,wo1,1,xint2,ymm(1,1,1,1),zmm(1,1,1,1),m,
+     $                   iwk,rwk,m,iffpts,intp_h2)
+C       do i=1, INTP_NMAX
+C         j=int(i/myint)+1
+C         tline(j)=tline(j)+wintr(i)*deltaz/(ZLEN)
 C       enddo
-C       call gop(wintr2,wintr3,'+  ',myint) 
-C       call gop(tline,wintr3,'+  ',myint) 
-      write(*,*)'patogrande',y_inter(100),wintr2(100),tline(100)
+
+
+
       if(istep.eq.0.and.nid.eq.0)then
       open(unit=57,file='test.dat',access='stream',form='unformatted')
-C        write(57) INTP_NMAX, mz, yint, zint, wintr,tline
-        write(57) INTP_NMAX,mz,m, y_inter, tline, yline, tline_in,wintr2
+       write(57) INTP_NMAX, mz, yint, zint, wintr,tline
+
+C       do i=1,lely
+C         do j=1,ly1
+C          write(57,*) tempbar(j,i)
+C          enddo
+C        enddo
       close(57)
        endif
 
@@ -726,7 +730,7 @@ c-----------------------------------------------------------------------
 C       if (y.lt.2) temp=3.0
 C       if (y.ge.2 .and. y.le.4) temp=2.0
 C       if (y.gt.4) temp=1.0
-C       temp=2*(y+1)**0.5
+      temp=2*y
 
       return
       end
@@ -1571,62 +1575,3 @@ c
         RA(I)=RRA
         goto 10
       END
-
-      subroutine spline(x,y,n,y2)
-      parameter (nmax=10000000)
-      dimension x(n),y(n),y2(n),u(nmax)
-      if (n.gt.nmax) then
-         write(6,11) n,nmax
-   11    FORMAT(2X,'ERROR:  Attempt to fit a spline with',I5
-     $            ,'greater than',I4,' points.'
-     $       ,/,2X,'Recompile routine SPLINE.')
-         call exitti('routine spline fail$',n)
-      endif
-      y2(1)=0.0
-      u(1) =0.0
-      do 10 i=2,n-1
-         ir=i+1
-         il=i-1
-         sig=(x(i)-x(il))/(x(ir)-x(il))
-         p=sig*y2(il)+2.
-         y2(i)=(sig-1.)/p
-         u(i)= ( 6.*
-     $     ( (y(ir)-y(i))/(x(ir)-x(i))-(y(i)-y(il))/ (x(i)-x(il) ) )
-     $            / (x(ir)-x(il))
-     $    - sig*u(il) )/p
-   10 continue
-      qn=0.0
-      un=0.0
-      y2(n)=(un-qn*u(n-1))/(qn*y2(n-1)+1.)
-      do 20 k=n-1,1,-1
-         y2(k)=y2(k)*y2(k+1)+u(k)
-   20 continue
-      return
-      end
-
-      subroutine splint(xa,ya,y2a,n,x,y)
-c     p. 88-89, numerical recipes
-      real xa(n),ya(n),y2a(n)
-      klo=1
-      khi=n
-    1   if ((khi-klo).gt.1) then
-           k=(khi+klo)/2
-           if (xa(k).gt.x) then
-              khi=k
-           else
-              klo=k
-           endif
-           goto 1
-        endif
-      h=xa(khi)-xa(klo)
-      if (h.eq.0) then
-C          write(6,*) xa(khi), 'splint failure',khi
-          y=0.0
-         return
-      endif
-      a=(xa(khi)-x)/h
-      b=(x-xa(klo))/h
-      y=a*ya(klo)+b*ya(khi)+
-     $  ((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.
-      return
-      end
