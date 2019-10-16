@@ -1,21 +1,20 @@
 c- constants -----------------------------------------------------------
 #define RITAU uparam(1)               /* Ri_tau */
-#define UTARGET uparam(2)             /* u_target for top PML, positive */ 
-#define VISCFAC uparam(3)             /* viscosity multiplier at ouflow */
-#define restart_inflow uparam(4)      /* whether to read inflow2d.ini (2d) for restasting */
-#define restart_means uparam(5)       /* whether to read means.ini for means restasting */
-#define iostep_2d_avg_time  uparam(6) /* output frequency for spanwise-time-averaged statistics */
-#define iostep_2d_notime uparam(7)    /*output frequency for spanwise-averaged statistics*/
-#define iostep_inflow uparam(8)       /* frequency of output for inflow2d file */
-#define delta_fltr uparam(9)          /* integration filter limit */
-#define RITAU2 uparam(10)               /* Ri_tau2 (downstream from the break in slope) */
+#define RITAU2 uparam(2)              /* Ri_tau2 (downstream from the break in slope) */
+#define UTARGET uparam(3)             /* u_target for top PML, positive */ 
+#define VISCFAC uparam(4)             /* viscosity multiplier at ouflow */
+#define restart_inflow uparam(5)      /* whether to read inflow2d.ini (2d) for restasting */
+#define restart_means uparam(6)       /* whether to read means.ini for means restasting */
+#define iostep_2d_avg_time  uparam(7) /* output frequency for spanwise-time-averaged statistics */
+#define iostep_2d_notime uparam(8)    /*output frequency for spanwise-averaged statistics*/
+#define iostep_inflow uparam(9)       /* frequency of output for inflow2d file */
 #define RE_TAU (1/param(2))           /* Re_tau */
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
-#define ZLEN (32.*PI)
-#define XLEN (8.*PI/3.)
-#define YLEN 20.
-#define ZBUFF (31.*PI)
+#define XLEN (uparam(10)*PI)
+#define YLEN uparam(11)
+#define ZLEN (uparam(12)*PI)
+#define ZBUFF (ZLEN-PI)
 #define YBUFF 12.
 #define NUMBER_ELEMENTS_X lelx
 #define NUMBER_ELEMENTS_Y lely
@@ -738,10 +737,7 @@ c-----------------------------------------------------------------------
       uz = 0.0
       temp = 0.0
 
-C       if (y.lt.2) temp=3.0
-C       if (y.ge.2 .and. y.le.4) temp=2.0
-C       if (y.gt.4) temp=1.0
-      temp=2*(y+1)**0.5
+
 
       return
       end
