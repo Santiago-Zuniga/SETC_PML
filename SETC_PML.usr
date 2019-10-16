@@ -195,7 +195,7 @@ c     INTERPOLATE EXTERNAL INFLOW FILE AND SETS INFLOW PLANE
       integer set_IC_flag
 
 c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
-      parameter(set_IC_flag=0)                           !<----- CHANGE!
+      parameter(set_IC_flag=1)                           !<----- CHANGE!
 
       parameter(nelin=nelxin*nelyin*nelzin)
       parameter(nel_slab=nelxin*nelyin)
@@ -1610,3 +1610,55 @@ C          write(6,*) xa(khi), 'splint failure',khi
      $  ((a**3-a)*y2a(klo)+(b**3-b)*y2a(khi))*(h**2)/6.
       return
       end
+
+      subroutine set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
+     $                 ,nel_slab)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'ZPER'
+
+      integer nelxin,nel_slab,nelin,nelyin,ex,ey,ez,eg,e,nxyz,egchnl
+      integer nchnlon,nelzin,ez1
+      real vxin(lx1,ly1,lz1,nelin)
+     $    ,vyin(lx1,ly1,lz1,nelin)
+     $    ,vzin(lx1,ly1,lz1,nelin)
+     $    ,tin(lx1,ly1,lz1,nelin)
+
+      character*80 icfile,istepc
+c     -----------------------------------------------------
+      nxyz = nx1*ny1*nz1
+
+      do e=1,nelv
+        eg = lglel(e)
+        call  get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+        if (ey.le.nelyin) then
+          if (mod(ez,nelzin).eq.0) then
+            nchnlon = int(ez/nelzin)
+          else
+            nchnlon = int(ez/nelzin)+1
+          endif
+          ez1 = ez - (nchnlon-1)*nelzin
+          egchnl = nel_slab*(ez1-1)+nelxin*(ey-1)+ex !Global element number
+          call copy(vx(1,1,1,e),vxin(1,1,1,egchnl),nxyz)
+          call copy(vy(1,1,1,e),vyin(1,1,1,egchnl),nxyz)
+          call copy(vz(1,1,1,e),vzin(1,1,1,egchnl),nxyz)
+        endif
+      enddo
+
+      do e=1,nelt
+        eg = lglel(e)
+        call  get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+        if (ey.le.nelyin) then
+          if (mod(ez,nelzin).eq.0) then
+            nchnlon = int(ez/nelzin)
+          else
+            nchnlon = int(ez/nelzin)+1
+          endif
+          ez1 = ez - (nchnlon-1)*nelzin
+          egchnl = nel_slab*(ez1-1)+nelxin*(ey-1)+ex !Global element number
+          call copy(t(1,1,1,e,1),tin(1,1,1,egchnl),nxyz)
+        endif
+      enddo
+      return
+      end 
