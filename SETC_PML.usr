@@ -782,8 +782,8 @@ c     vertical grid spacing
           y = y / rrlenyint
           yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
         elseif (y.gt.hfint) then
-          y = y/rrleny
-          yc(i,1)=y*nelytot-(nelytot-YLEN)
+            y=(y-hfint)/(rrleny-hfint)
+            yc(i,1)=y*(YLEN-hfint)+hfint
         endif
         xc(i,1) =  XLEN * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
