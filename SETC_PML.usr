@@ -38,7 +38,7 @@ c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
       real zout,zdiff
        
-      zout = ZLEN-PI                               !<----------CHANGE!
+      zout = ZLEN-3*PI                               !<----------CHANGE!
       zdiff=ZLEN-zout
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
@@ -196,7 +196,7 @@ c     INTERPOLATE EXTERNAL INFLOW FILE AND SETS INFLOW PLANE
       integer set_IC_flag
 
 c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
-      parameter(set_IC_flag=1)                           !<----- CHANGE!
+      parameter(set_IC_flag=0)                           !<----- CHANGE!
 
       parameter(nelin=nelxin*nelyin*nelzin)
       parameter(nel_slab=nelxin*nelyin)
@@ -207,27 +207,14 @@ c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
      $    ,vzin(lx1,ly1,lz1,nelin)
      $    ,tin(lx1,ly1,lz1,nelin)
 
+      real yline(ly1,lely),y_slab(ly1,lely)
+
       common /inflow_pl/ vxin_pl(lx1,ly1,nel_slab)
      $                  ,vyin_pl(lx1,ly1,nel_slab)
      $                  ,vzin_pl(lx1,ly1,nel_slab)
      $                  ,tin_pl(lx1,ly1,nel_slab)
       save z_inflow
-
-c     ############################################################
-c     DEPTH-AVERAGED STATISTICS VARIABLES
-
-c     Output frequency of span-time-averaged .fld files
-c     and means.* binary files
-
-c     Output frequency of span-averaged .fld files
-C       integer iostep_2d
-C       parameter( iostep_2d= 1000 )          !<-----------CHANGE!
-
-c     Integration filter: The moments of velocity and concentration
-c     are computed from z=0 to z=z_delta_fltr where z_delta_fltr
-c     is the wall-normal location where we find a concentration
-c     c<=delta_fltr
-
+      real theta
 
       real timem,atimem,timelm,dtimem,t_tot
 
@@ -283,6 +270,8 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
      &              ,  w2(ly1,lz1,lely,lelz)
      &              ,  w3(ly1,lz1,lely,lelz)
      &              ,  w4(ly1,lz1,lely,lelz)
+     &              ,  wy1(ly1,nely)
+     &              ,  wy2(ly1,nely)
       save igs_x, igs_z
 
 c     2d spanwise-averaged arrays 
@@ -411,12 +400,13 @@ c     interpolating the solution for a TC with fixed mean
 c     streamwise velocity and concentration
 
       dtimestep = abs(dt)
+      theta=atan(1/RITAU)
 c     READ INFLOW
       if (istep.eq.0) then
         call read_inflow(vxin,vyin,vzin,tin,nelin,nin)
         if (set_IC_flag.eq.1) then
           call set_IC(vxin,vyin,vzin,tin,nelin,nelxin,nelyin,nelzin
-     $               ,nel_slab)
+     $               ,nel_slab,theta)
         endif
       endif
 
@@ -441,6 +431,7 @@ c     OUTPUT INITIAL CONDITION
 c     ############################################################
       if (istep.eq.0) then 
         call x_slice(ymm,ym1,w1,w2)
+C         call y_line(yline,ym1,w1,w2)
       endif
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
@@ -1720,7 +1711,7 @@ C          write(6,*) xa(khi), 'splint failure',khi
       end
 
       subroutine set_IC(vxin,vyin,vzin,tin,nelin,nelx_in,nely_in,nelz_in
-     $                 ,nel_slab)
+     $                 ,nel_slab,theta)
 
       include 'SIZE'
       include 'TOTAL'
@@ -1732,10 +1723,18 @@ C          write(6,*) xa(khi), 'splint failure',khi
      $    ,vyin(lx1,ly1,lz1,nelin)
      $    ,vzin(lx1,ly1,lz1,nelin)
      $    ,tin(lx1,ly1,lz1,nelin)
-
+      real theta
       character*80 icfile,istepc
+      real tmpz,tmpy
 c     -----------------------------------------------------
       nxyz = nx1*ny1*nz1
+      do i=1,lx1*ly1*lz1*nelin
+        tmpz=vzin(i,1,1,1)*cos(theta)+vyin(i,1,1,1)*sin(theta)
+        tmpy=vyin(i,1,1,1)*cos(theta)-vzin(i,1,1,1)*sin(theta)
+        vzin(i,1,1,1)=tmpz
+        vyin(i,1,1,1)=tmpy
+      enddo
+
 
       do e=1,nelv
         eg = lglel(e)
