@@ -207,8 +207,6 @@ c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
      $    ,vzin(lx1,ly1,lz1,nelin)
      $    ,tin(lx1,ly1,lz1,nelin)
 
-      real yline(ly1,lely),y_slab(ly1,lely)
-
       common /inflow_pl/ vxin_pl(lx1,ly1,nel_slab)
      $                  ,vyin_pl(lx1,ly1,nel_slab)
      $                  ,vzin_pl(lx1,ly1,nel_slab)
@@ -364,6 +362,10 @@ c     HYDROSTATIC PRESSURE VARIABLES
       parameter (llt=lx1*ly1*lz1*lelt)
       common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
 
+      parameter (n_slab=ly1*nelyin)
+      real wslab(n_slab)
+      common /inflow_interp/ y_slab(n_slab)
+
       nelx  = NUMBER_ELEMENTS_X
       nely  = NUMBER_ELEMENTS_Y
       nelz  = NUMBER_ELEMENTS_Z
@@ -398,6 +400,9 @@ c     This code is made for a mesh composed of only one box.
 c     Computes the inlet boundary condition for the next time step
 c     interpolating the solution for a TC with fixed mean 
 c     streamwise velocity and concentration
+      if (istep.eq.0) then
+            call yslab(y_slab,ym1,wslab,n_slab,nelyin)
+      endif
 
       dtimestep = abs(dt)
       theta=atan(1/RITAU)
@@ -431,7 +436,6 @@ c     OUTPUT INITIAL CONDITION
 c     ############################################################
       if (istep.eq.0) then 
         call x_slice(ymm,ym1,w1,w2)
-C         call y_line(yline,ym1,w1,w2)
       endif
       if(icalled.eq.0) then
         call rzero(rumm,size(rumm))
@@ -802,7 +806,7 @@ c-----------------------------------------------------------------------
       real theta1, theta2, A1, A2, zh
 
       theta1=atan(1/RITAU)
-      theta2=atan(1/Ri_tau2)
+      theta2=atan(1/RITAU2)
       zh=(ZLEN)/2.0
       A1=zh/RITAU   !zh*tan(theta)
       A2=zh/RITAU2
@@ -818,20 +822,19 @@ c
       hfh=hf/2.0
       hfint = rrlenyint
       amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
-
 c     vertical grid spacing      
       do i=1,n
         yc(i,1)  = rrleny * yc(i,1) 
         y=yc(i,1)
 
-        if (y.le.hfh) then
+        if ((AINT(y*100.0)/100.0).le.hfh) then
           yc(i,1) = (-1)*(1-SINH(3.25*y)/SINH(3.25))+1
-        elseif (y.le.hf) then
+        elseif ((AINT(y*100.0)/100.0).le.hf) then
           yc(i,1) = (1)*(1 - SINH(3.25*(2-y))/SINH(3.25))+1
-        elseif (y.le.hfint) then
+        elseif ((AINT(y*100.0)/100.0).le.hfint) then
           y = y / rrlenyint
           yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
-        elseif (y.gt.hfint) then
+        elseif ((AINT(y*100.0)/100.0).gt.hfint) then
             y=(y-hfint)/(rrleny-hfint)
             yc(i,1)=y*(YLEN-hfint)+hfint
         endif
@@ -844,8 +847,8 @@ c     sloping
       do i=1,n
         y=yc(i,1)
         z=zc(i,1)
-        if(z.lt.zh) then
-          if(y.le.hfint) then
+        if((AINT(z*100.0)/100.0).lt.zh) then
+          if((AINT(y*100.0)/100.0).le.hfint) then
             yc(i,1)=y+A1*((-1.0/zh)*z+1)+A2
           else
             yc(i,1)=y+((-A1/(YLEN-hfint))*(y-hfint)+A1)*
@@ -853,7 +856,7 @@ c     sloping
      &                ((-A2/(YLEN-hfint))*(y-hfint)+A2)
           endif !(y.le.hfint)
         else
-          if(y.le.hfint) then
+          if((AINT(y*100.0)/100.0).le.hfint) then
             yc(i,1)=y+A2*((-1.0/zh)*(z-zh)+1)
           else
             yc(i,1)=y+((-A2/(YLEN-hfint))*
@@ -1178,7 +1181,41 @@ c
 
       return
       end
-c---------------------------------------------------------------------      
+c--------------------------------------------------------------------- 
+      subroutine yslab (ua,u,w1,nslab,nely_in)
+c
+c     Extract a y line of quantity u() - assumes global tens.prod.
+c
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua(nslab),u(nx1,ny1,nz1,nelv)
+     $    ,w1(nslab)
+      integer e,eg,ex,ey,ez
+      real dy2
+c
+C       my = nely*ny1
+      call rzero(ua,nslab)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+         i = 1
+         k = 1
+         if (ex.eq.1 .and. ez.eq.1.and. ey.le.nely_in) then
+            do j=1,ny1
+               ua(j+ey*ny1-ny1) = u(i,j,k,e)-u(1,1,1,1)
+            enddo
+         endif
+      enddo
+      call gop(ua,w1,'+  ',nslab)
+
+      return
+      end     
 C       subroutine z_line (ua,u,w1,w2)
 C c
 C c     Extract a z line of quantity u() - assumes global tens.prod.
