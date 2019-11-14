@@ -242,9 +242,9 @@ c     spanwise-averaged arrays
      & , suvm_2d(ly1,lz1,lely,lelz,6)
      & , suxm_2d(ly1,lz1,lely,lelz,12)
      & , sux2_2d(ly1,lz1,lely,lelz,12)
-     & , su3m_2d(lx1,ly1,lz1,lelt,4)
-     & , sv2u_2d(lx1,ly1,lz1,lelt,6)
-     & , spmm_2d(lx1,ly1,lz1,lelt,4)
+     & , su3m_2d(ly1,lz1,lely,lelz,4)
+     & , sv2u_2d(ly1,lz1,lely,lelz,6)
+     & , spmm_2d(ly1,lz1,lely,lelz,4)
 c      save ravg, stat, stat2d
 c      save rumm,rux2,ruvm,ruxm,rux2,summ,sux2,suvm,suxm,sux2,
 c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common block
@@ -258,6 +258,8 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
      & , su3m_2d_o(lx1,ly1,lz1,lelt,4)
      & , sv2u_2d_o(lx1,ly1,lz1,lelt,6)
      & , spmm_2d_o(lx1,ly1,lz1,lelt,4)
+
+      integer counter1
 
       logical ifverbose
       real   wo1(lx1,ly1,lz1,lelv)
@@ -477,6 +479,7 @@ c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
         beta      = dtime / atime
+        beta = 1.0
         alpha     = 1. - beta
 c     compute gradients
         call gradm1(vxx,vxy,vxz,vx)
@@ -566,31 +569,67 @@ c        Compute p, up, vp, wp
       timel = time 
 
 c     ############################################################
-      if (istep.ne.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
+C       if (istep.ne.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
+C c     spanwise averaging
+C         do i =1,12
+C           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(suxm_2d(1,1,1,1,i),suxm(1,1,1,1,i),w1,w2)
+C           call planar_avg(sux2(1,1,1,1,i),rux2(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(sux2_2d(1,1,1,1,i),sux2(1,1,1,1,i),w1,w2)
+C         enddo
+C         do i =1,6
+C           call planar_avg(suvm(1,1,1,1,i),ruvm(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(suvm_2d(1,1,1,1,i),suvm(1,1,1,1,i),w1,w2)
+C           call planar_avg(sv2u(1,1,1,1,i),rv2u(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(sv2u_2d(1,1,1,1,i),sv2u(1,1,1,1,i),w1,w2)
+C         enddo
+C         do i =1,4
+C           call planar_avg(summ(1,1,1,1,i),rumm(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(summ_2d(1,1,1,1,i),summ(1,1,1,1,i),w1,w2)
+C           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
+C           call planar_avg(su3m(1,1,1,1,i),ru3m(1,1,1,1,i),igs_x) !x averaging
+C           call x_slice(su3m_2d(1,1,1,1,i),su3m(1,1,1,1,i),w1,w2)
+C C           call planar_avg(spmm(1,1,1,1,i),rpmm(1,1,1,1,i),igs_x) !x averaging
+C C           call x_slice(spmm_2d(1,1,1,1,i),spmm(1,1,1,1,i),w1,w2)
+C         enddo
+C          if (restart_means.eq.0) call output_means(atime,timel,dtime,w4)
+C       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
+
+      if (istep.ne.0 .and.mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     spanwise averaging
         do i =1,12
           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(suxm_2d(1,1,1,1,i),suxm(1,1,1,1,i),w1,w2)
+          call x_slice2(suxm(1,1,1,1,i),w1)     !x_slice2 and 3 take an slice on the yz plane. They are both needed to avoid unnnecessary memory declarations on all procceses
+          if (nid.eq.0) call x_slice3(suxm_2d(1,1,1,1,i))
           call planar_avg(sux2(1,1,1,1,i),rux2(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(sux2_2d(1,1,1,1,i),sux2(1,1,1,1,i),w1,w2)
+          call x_slice2(sux2(1,1,1,1,i),w1)
+          if (nid.eq.0) call x_slice3(sux2_2d(1,1,1,1,i))
         enddo
         do i =1,6
           call planar_avg(suvm(1,1,1,1,i),ruvm(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(suvm_2d(1,1,1,1,i),suvm(1,1,1,1,i),w1,w2)
+          call x_slice2(suvm(1,1,1,1,i),w1)
+          if (nid.eq.0)  call x_slice3(suvm_2d(1,1,1,1,i))
           call planar_avg(sv2u(1,1,1,1,i),rv2u(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(sv2u_2d(1,1,1,1,i),sv2u(1,1,1,1,i),w1,w2)
+          call x_slice2(sv2u(1,1,1,1,i),w1)
+          if (nid.eq.0)   call x_slice3(sv2u_2d(1,1,1,1,i))
         enddo
         do i =1,4
           call planar_avg(summ(1,1,1,1,i),rumm(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(summ_2d(1,1,1,1,i),summ(1,1,1,1,i),w1,w2)
+          call x_slice2(summ(1,1,1,1,i),w1)
+          if (nid.eq.0)call x_slice3(summ_2d(1,1,1,1,i))
           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
+          call x_slice2(su2m(1,1,1,1,i),w1)
+          if (nid.eq.0)call x_slice3(su2m_2d(1,1,1,1,i))
           call planar_avg(su3m(1,1,1,1,i),ru3m(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(su3m_2d(1,1,1,1,i),su3m(1,1,1,1,i),w1,w2)
+          call x_slice2(su3m(1,1,1,1,i),w1)
+          if (nid.eq.0)call x_slice3(su3m_2d(1,1,1,1,i))
           call planar_avg(spmm(1,1,1,1,i),rpmm(1,1,1,1,i),igs_x) !x averaging
-          call x_slice(spmm_2d(1,1,1,1,i),spmm(1,1,1,1,i),w1,w2)
+          call x_slice2(spmm(1,1,1,1,i),w1)
+          if (nid.eq.0)call x_slice3(spmm_2d(1,1,1,1,i))
         enddo
-         if (restart_means.eq.0) call output_means(atime,timel,dtime)
+        call nekgsync()
+         if (restart_means.eq.0) call output_means(atime,timel,dtime,w4)
       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
 c     ############################################################
 c     load restart statistics and average them with the new ones 
@@ -633,7 +672,7 @@ c     load restart statistics and average them with the new ones
            call avg1(spmm_2d(1,1,1,1,i),spmm_2d_o(1,1,1,1,i),alpha,beta,
      &        m,'pavg',ifverbose)
         enddo
-        call output_means(t_tot,timel,dtime)
+        call output_means(t_tot,timel,dtime,w4)
       endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
 c     ############################################################
 c     write 2d fld spanwise-averaged files 
@@ -644,14 +683,21 @@ c     write 2d fld spanwise-averaged files
               icnt_time=1
           endif
           call planar_avg(wo1,vz,igs_x) 
-          call x_slice(w2d,wo1,w1,w2)
+C           call x_slice(w2d,wo1,w1,w2)
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(w2d)
+
 
           call planar_avg(wo1,vy,igs_x) 
-          call x_slice(v2d,wo1,w1,w2)
+C           call x_slice(v2d,wo1,w1,w2)
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(v2d)
 
           call planar_avg(wo1,t(1,1,1,1,1),igs_x) 
-          call x_slice(tt2d,wo1,w1,w2)
-          call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ny1,nz1,nely,nelz,'sag',
+C           call x_slice(tt2d,wo1,w1,w2)
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(tt2d)
+          call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ly1,lz1,lely,lelz,'sag',
      &       icnt_time)
           icnt_time=icnt_time+1
       endif
@@ -1118,8 +1164,8 @@ c
       include 'WZ'
       include 'ZPER'
 c
-      real ua(ny1,nz1,nely,nelz),u(nx1,ny1,nz1,nelv)
-     $    ,w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
+      real ua(ny1,nz1,nely,nelz),u(nx1,ny1,nz1,nelt),
+     $     w1(ny1,nz1,nely,nelz),w2(ny1,nz1,nely,nelz)
       integer e,eg,ex,ey,ez
       real dy2
 c
@@ -1146,6 +1192,71 @@ c
       return
       end
 
+      subroutine x_slice2 (u,w1)
+c
+c     Extract a x slice of quantity u() - assumes global tens.prod.
+c     It doesn't return the result. 
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real u(nx1,ny1,nz1,nelt),
+     $     w1(ny1,nz1,nely,nelz)
+      integer nst,ist
+      integer e,eg,ex,ey,ez
+      real dy2
+C       real ua(ny1,nz1,nely,nelz)
+      common /xslice2/
+     &   ua(ly1,lz1,lely,lelz)
+c
+      myz = nely*nelz*ny1*nz1
+      call rzero(ua,myz)
+c
+      do e=1,nelt
+c
+         eg = lglel(e)
+         call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+
+         i = 1
+         if (ex.eq.1) then
+            do k=1,nz1
+            do j=1,ny1
+               ua(j,k,ey,ez) = u(i,j,k,e)
+            enddo
+            enddo
+         endif
+      enddo
+
+      call gop(ua,w1,'+  ',myz)
+
+      return
+      end
+
+      subroutine x_slice3 (ua2)
+c
+c     Extract a x slice of quantity u() - assumes global tens.prod.
+c     It must be called RIGHT AFTER x_slice2
+      include 'SIZE'
+      include 'GEOM'
+      include 'PARALLEL'
+      include 'WZ'
+      include 'ZPER'
+c
+      real ua2(ny1,nz1,nely,nelz)
+      integer e,eg,ex,ey,ez
+      real dy2
+      common /xslice2/
+     &   ua(ly1,lz1,lely,lelz)
+
+c
+      myz = nely*nelz*ny1*nz1
+      call rzero(ua2,myz)
+
+      call copy(ua2,ua,myz)
+      return
+      end
 c---------------------------------------------------------------------      
       subroutine y_line (ua,u,w1,w2)
 c
@@ -1394,7 +1505,7 @@ c
       return
       end
 
-       subroutine output_means(atime,timel,dtime)
+       subroutine output_means(atime,timel,dtime,w4)
 
        include 'SIZE'
        include 'TOTAL'
@@ -1402,7 +1513,7 @@ c
 
        real atime,timel,dtime
        character*80 icfile,istepc
-       common /gaaa/ w4(ly1,lz1,lely,lelz)
+       real w4(ly1,lz1,lely,lelz)
 
       common /avgstats/
      &  rumm(lx1,ly1,lz1,lelt,4)
@@ -1426,9 +1537,9 @@ c
      & , suvm_2d(ly1,lz1,lely,lelz,6)
      & , suxm_2d(ly1,lz1,lely,lelz,12)
      & , sux2_2d(ly1,lz1,lely,lelz,12)
-     & , su3m_2d(lx1,ly1,lz1,lelt,4)
-     & , sv2u_2d(lx1,ly1,lz1,lelt,6)
-     & , spmm_2d(lx1,ly1,lz1,lelt,4)
+     & , su3m_2d(ly1,lz1,lely,lelz,4)
+     & , sv2u_2d(ly1,lz1,lely,lelz,6)
+     & , spmm_2d(ly1,lz1,lely,lelz,4)
 
 
        m=ny1*nz1*lely*lelz
@@ -1476,6 +1587,7 @@ c
        endif
        return
        end
+
 
       subroutine input_means(time_old,atime,timel,dtime)
       include 'SIZE'
@@ -1611,6 +1723,7 @@ c-----------------------------------------------------------------------
 
       include 'SIZE'
       include 'TOTAL'
+      include 'ZPER'
 
       real z(ny,nz,nly,nlz)
       real y(ny,nz,nly,nlz)
@@ -1629,14 +1742,14 @@ c     if (istep.le.10) write(6,*) nid,' in out2d:',iz
 c
       excode(1) = 'X '
       excode(2) = 'Y '
-c     excode(3) = 'U '
+      excode(3) = 'U '
 c     excode(4) = 'V '
 c     excode(5) = 'P '
 c     excode(6) = 'T '
 c
-      excode(4) = 'U '
-      excode(5) = '  '
-      excode(6) = 'T '
+      excode(4) = '  '
+      excode(5) = 'T '
+C       excode(6) = 'T '
       nthings   =  6
 
       ierr = 0 
