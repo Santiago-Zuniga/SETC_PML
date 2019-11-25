@@ -26,7 +26,8 @@ c - Iflow dimensions
 #define nelzin 14
 #define zlen_inflow (8.*PI)
 #define hf 2.0 /*height of inflow domain*/
-#define nelyint 13
+#define nelyint 13 /*number of elements in the higher resolution zone*/
+#define hint 6 /*height of heigher resolution zone*/
 
 
       subroutine uservp (ix,iy,iz,eg)
@@ -867,8 +868,8 @@ c
       rrlenyint = nelyint*delyi
       hfh=hf/2.0
       hfint = rrlenyint
-      amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
-      anint=6.0
+      amp=ASINH(((hint-hf)/hint)*SINH(-3.25))/((hf/rrlenyint-1.0)*3.25)
+
 c     vertical grid spacing      
       do i=1,n
         yc(i,1)  = rrleny * yc(i,1) 
@@ -880,9 +881,9 @@ c     vertical grid spacing
           yc(i,1) = (1)*(1 - SINH(3.25*(2-y))/SINH(3.25))+1
         elseif ((AINT(y*100.0)/100.0).le.hfint) then
           y = y / rrlenyint
-          yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
+          yc(i,1)= (hint*SINH(3.25*amp*(hf/rrlenyint-y))/SINH(-3.25))+2
         elseif ((AINT(y*100.0)/100.0).gt.hfint) then
-              yc(i,1)=(y-hfint)*(YLEN-anint)/(rrleny-hfint)+anint
+              yc(i,1)=(y-hfint)*(YLEN-hint)/(rrleny-hfint)+hint
 C             y=(y-hfint)/(rrleny-hfint)
 C             yc(i,1)=y*(YLEN-hfint)+hfint
         endif
@@ -890,25 +891,24 @@ C             yc(i,1)=y*(YLEN-hfint)+hfint
         zc(i,1) = ZLEN * zc(i,1)
       enddo
 
-
 c     sloping
       do i=1,n
         y=yc(i,1)
         z=zc(i,1)
         if((AINT(z*100.0)/100.0).lt.zh) then
-          if((AINT(y*100.0)/100.0).le.hfint) then
+          if((AINT(y*100.0)/100.0).le.hint) then
             yc(i,1)=y+A1*((-1.0/zh)*z+1)+A2
           else
-            yc(i,1)=y+((-A1/(YLEN-hfint))*(y-hfint)+A1)*
+            yc(i,1)=y+((-A1/(YLEN-hint))*(y-hint)+A1)*
      &                ((-1.0/zh)*z+1)+
-     &                ((-A2/(YLEN-hfint))*(y-hfint)+A2)
+     &                ((-A2/(YLEN-hint))*(y-hint)+A2)
           endif !(y.le.hfint)
         else
-          if((AINT(y*100.0)/100.0).le.hfint) then
+          if((AINT(y*100.0)/100.0).le.hint) then
             yc(i,1)=y+A2*((-1.0/zh)*(z-zh)+1)
           else
-            yc(i,1)=y+((-A2/(YLEN-hfint))*
-     &         (y-hfint)+A2)*((-1.0/zh)*
+            yc(i,1)=y+((-A2/(YLEN-hint))*
+     &         (y-hint)+A2)*((-1.0/zh)*
      &                (z-zh)+1)
           endif !(y.le.hfint)
         endif !(z.lt.zh)
