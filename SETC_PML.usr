@@ -479,7 +479,7 @@ c     ############################################################
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
         beta      = dtime / atime
-        beta = 1.0
+C         beta = 1.0
         alpha     = 1. - beta
 c     compute gradients
         call gradm1(vxx,vxy,vxz,vx)
@@ -849,7 +849,7 @@ c-----------------------------------------------------------------------
       
       integer n,nelytot,mmnely
       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y,z
-      real theta1, theta2, A1, A2, zh
+      real theta1, theta2, A1, A2, zh, anint
 
       theta1=atan(1/RITAU)
       theta2=atan(1/RITAU2)
@@ -868,6 +868,7 @@ c
       hfh=hf/2.0
       hfint = rrlenyint
       amp = (ASINH((4.0/6.0)*SINH(-3.25)))/(-0.7*3.25)
+      anint=6.0
 c     vertical grid spacing      
       do i=1,n
         yc(i,1)  = rrleny * yc(i,1) 
@@ -881,8 +882,9 @@ c     vertical grid spacing
           y = y / rrlenyint
           yc(i,1)= (6*SINH(3.25*amp*(0.3-y))/SINH(-3.25))+2
         elseif ((AINT(y*100.0)/100.0).gt.hfint) then
-            y=(y-hfint)/(rrleny-hfint)
-            yc(i,1)=y*(YLEN-hfint)+hfint
+              yc(i,1)=(y-hfint)*(YLEN-anint)/(rrleny-hfint)+anint
+C             y=(y-hfint)/(rrleny-hfint)
+C             yc(i,1)=y*(YLEN-hfint)+hfint
         endif
         xc(i,1) =  XLEN * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
