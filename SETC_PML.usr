@@ -676,13 +676,13 @@ c     load restart statistics and average them with the new ones
         call output_means(t_tot,timel,dtime,w4)
       endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
 c     ############################################################
-c     write 2d fld spanwise-averaged files 
+c     write 2d spanwise-averaged files 
       if(mod(istep,int(iostep_2d_notime)).eq.0) then
-          if(istep.eq.0)then
-              call x_slice(y2d,ym1,w1,w2)
-              call x_slice(z2d,zm1,w1,w2)
-              icnt_time=1
-          endif
+C           if(istep.eq.0)then
+C               call x_slice(y2d,ym1,w1,w2)
+C               call x_slice(z2d,zm1,w1,w2)
+C               icnt_time=1
+C           endif
           call planar_avg(wo1,vz,igs_x) 
 C           call x_slice(w2d,wo1,w1,w2)
           call x_slice2(wo1,w1)
@@ -698,9 +698,11 @@ C           call x_slice(v2d,wo1,w1,w2)
 C           call x_slice(tt2d,wo1,w1,w2)
           call x_slice2(wo1,w1)
           if (nid.eq.0) call x_slice3(tt2d)
-          call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ly1,lz1,lely,lelz,'sag',
-     &       icnt_time)
-          icnt_time=icnt_time+1
+          call nekgsync()
+C           call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ly1,lz1,lely,lelz,'sag',
+C      &       icnt_time)
+C           icnt_time=icnt_time+1
+          call output_2d(time,w2d,v2d,tt2d)
       endif
 
 
@@ -1921,3 +1923,30 @@ c     -----------------------------------------------------
       enddo
       return
       end
+
+      subroutine output_2d(timel,um,vm,tm)
+
+       include 'SIZE'
+       include 'TOTAL'
+       include 'ZPER'
+
+       real timel
+       real um(ly1,lz1,lely,lelz),vm(ly1,lz1,lely,lelz),
+     &      tm(ly1,lz1,lely,lelz)
+       character*80 icfile,istepc
+
+       if(nid.eq.0) then
+          write(*,*)'******Writing spanwise-averaged file....*******'
+          write(istepc,'(i32)') istep
+          istepc=adjustl(istepc)
+          icfile=trim('2dmeans.'//trim(istepc))
+          open(unit=58,file=icfile,access='stream',form='unformatted')
+          write(58) time
+          write(58) int(nx1),int(lelx),int(lely),int(lelz)
+          write(58)um
+          write(58)vm
+          write(58)tm
+          close(58)
+       endif
+       return
+       end
