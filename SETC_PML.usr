@@ -1,14 +1,16 @@
 c- constants -----------------------------------------------------------
-#define RITAU uparam(1)               /* Ri_tau */
-#define RITAU2 uparam(2)              /* Ri_tau2 (downstream from the break in slope) */
-#define UTARGET uparam(3)             /* u_target for top PML, positive */ 
-#define VISCFAC uparam(4)             /* viscosity multiplier at ouflow */
-#define restart_inflow uparam(5)      /* whether to read inflow2d.ini (2d) for restasting */
-#define restart_means uparam(6)       /* whether to read means.ini for means restasting */
-#define iostep_2d_avg_time  uparam(7) /* output frequency for spanwise-time-averaged statistics */
-#define iostep_2d_notime uparam(8)    /*output frequency for spanwise-averaged statistics*/
-#define iostep_inflow param(15)       /* frequency of output for inflow2d file */
-#define RE_TAU (1/param(2))           /* Re_tau */
+#define RITAU uparam(1)                         /* Ri_tau */
+#define RITAU2 uparam(2)                        /* Ri_tau2 (downstream from the break in slope) */
+#define UTARGET uparam(3)                       /* u_target for top PML, positive */ 
+#define VISCFAC uparam(4)                       /* viscosity multiplier at ouflow */
+#define restart_inflow uparam(5)                /* whether to read inflow2d.ini (2d) for restasting */
+#define restart_means abs(uparam(6))/uparam(6)  /* whether to read means.ini for means restasting (>0)*/
+#define iostep_2d_avg_time  abs(uparam(6))      /* output frequency for spanwise-time-averaged statistics */
+#define iostep_start abs(uparam(7))             /* start interation for means accumulation */
+#define iostep_2d_notime uparam(8)              /* output frequency for spanwise-averaged statistics*/
+#define iostep_inflow param(15)                 /* frequency of output for inflow2d file */
+#define RE_TAU (1/param(2))                     /* Re_tau */
+
 c - mesh and buffer zones dimensions
 #define PI (4.*atan(1.))
 #define XLEN (8.0*PI/3.0)
@@ -21,13 +23,13 @@ c - mesh and buffer zones dimensions
 #define NUMBER_ELEMENTS_Z lelz
 
 c - Iflow dimensions
-#define nelxin 8 /*number of elements of inflow array */
+#define nelxin 8              /*number of elements of inflow array */
 #define nelyin 4
 #define nelzin 14
-#define zlen_inflow (8.*PI)
-#define hf 2.0 /*height of inflow domain*/
-#define nelyint 13 /*number of elements in the higher resolution zone*/
-#define hint 6 /*height of heigher resolution zone*/
+#define zlen_inflow (8.*PI)   /*lenght of inflow domain*/
+#define hf 2.0                /*height of inflow domain*/
+#define nelyint 13            /*number of elements in the higher resolution zone*/
+#define hint 6                /*height of heigher resolution zone*/
 
 
       subroutine uservp (ix,iy,iz,eg)
@@ -39,7 +41,7 @@ c     TURBULENT OUTFLOW
 c     Sets low Re number in range [zout;lenz]
       real zout,zdiff
        
-      zout = ZLEN-3*PI                               !<----------CHANGE!
+      zout = ZLEN-3*PI                             !<----------CHANGE!
       zdiff=ZLEN-zout
       if(ifield.eq.1)then                          ! momentum equation
          utrans= param(1)
@@ -48,7 +50,7 @@ c     Sets low Re number in range [zout;lenz]
                udiff =((param(2)*VISCFAC-param(2))/zdiff)
      $            *(z-zout) + param(2)
          endif
-      else if(ifield.eq.2)then                    ! temperature eqn
+      else if(ifield.eq.2)then                     ! temperature eqn
         utrans= param(7)
         udiff = param(8)
         if (z.ge.zout) then
@@ -203,6 +205,9 @@ c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
       parameter(nel_slab=nelxin*nelyin)
       parameter(nin = nelin*lx1*ly1*lz1)
 
+      integer if_mean_2d
+      save if_mean_2d
+
       real vxin(lx1,ly1,lz1,nelin)
      $    ,vyin(lx1,ly1,lz1,nelin)
      $    ,vzin(lx1,ly1,lz1,nelin)
@@ -214,8 +219,6 @@ c     If set_IC_flag.eq.1 copy inflow file at bottom of big domain
      $                  ,tin_pl(lx1,ly1,nel_slab)
       save z_inflow
       real theta
-
-      real timem,atimem,timelm,dtimem,t_tot
 
 c     spanwise-averaged arrays
       real    yavgx(ny1,nz1,lely,lelz)
@@ -246,9 +249,7 @@ c     spanwise-averaged arrays
      & , su3m_2d(ly1,lz1,lely,lelz,4)
      & , sv2u_2d(ly1,lz1,lely,lelz,6)
      & , spmm_2d(ly1,lz1,lely,lelz,4)
-c      save ravg, stat, stat2d
-c      save rumm,rux2,ruvm,ruxm,rux2,summ,sux2,suvm,suxm,sux2,
-c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common block
+
 
       common /avgstats_old/
      &  summ_2d_o(ly1,lz1,lely,lelz,4)
@@ -259,6 +260,7 @@ c     &     summ_2d,sux2_2d,suvm_2d,suxm_2d,sux2_2d   !not necessary in a common
      & , su3m_2d_o(lx1,ly1,lz1,lelt,4)
      & , sv2u_2d_o(lx1,ly1,lz1,lelt,6)
      & , spmm_2d_o(lx1,ly1,lz1,lelt,4)
+     & , timem,atimem,timelm,dtimem,t_tot
 
       integer counter1
 
@@ -477,10 +479,65 @@ c     ############################################################
       dtime = time - timel
       atime = atime + dtime
 c     ############################################################
+
+c     write 2d spanwise-averaged files 
+      if(mod(istep,int(iostep_2d_notime)).eq.0) then
+          call planar_avg(wo1,vz,igs_x) 
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(w2d)
+
+          call planar_avg(wo1,vy,igs_x) 
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(v2d)
+
+          call planar_avg(wo1,t(1,1,1,1,1),igs_x) 
+          call x_slice2(wo1,w1)
+          if (nid.eq.0) call x_slice3(tt2d)
+          call nekgsync()
+
+          call output_2d(time,w2d,v2d,tt2d)
+      endif
+
+
+c     ############################################################
+c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
+c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
+      call rzero(tempbar,m) !wo1,2(lx1,ly1,lz1,lelv)
+      call cfill(wintr,151413121110987654321.,size(wintr))
+      call rzero(tline,myint)
+      call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
+
+      call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
+     $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
+      if(nid.eq.0) then
+        do i=1,myint
+          zdum=0.0
+          do j=1,mz
+              k=i+(j-1)*myint
+              if (wintr(k).ne.151413121110987654321.) then
+                tline(i)=tline(i)+wintr(k)*deltaz
+                zdum=zdum+deltaz
+              endif
+            enddo
+          tline(i)=tline(i)/zdum
+        enddo
+        call spline(y_inter,tline,myint,wintr2,wintr3)
+        do i=1,m
+          call splint(y_inter,tline,wintr2,myint,ymm(i,1,1,1),
+     $         tempbar(i,1,1,1))
+        enddo
+      endif
+      call rzero(w1,m)
+      call gop(tempbar,w1,'+  ',m)
+
+c     ############################################################
+
+      if (istep.lt.int(iostep_start)) return
+
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
         beta      = dtime / atime
-C         beta = 1.0
+        if (uparam(7).lt.0) beta = 1.0   !means will not be accumulated on time. Not the most elegant solution, I know.
         alpha     = 1. - beta
 c     compute gradients
         call gradm1(vxx,vxy,vxz,vx)
@@ -570,34 +627,9 @@ c        Compute p, up, vp, wp
       timel = time 
 
 c     ############################################################
-C       if (istep.ne.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0) then
-C c     spanwise averaging
-C         do i =1,12
-C           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(suxm_2d(1,1,1,1,i),suxm(1,1,1,1,i),w1,w2)
-C           call planar_avg(sux2(1,1,1,1,i),rux2(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(sux2_2d(1,1,1,1,i),sux2(1,1,1,1,i),w1,w2)
-C         enddo
-C         do i =1,6
-C           call planar_avg(suvm(1,1,1,1,i),ruvm(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(suvm_2d(1,1,1,1,i),suvm(1,1,1,1,i),w1,w2)
-C           call planar_avg(sv2u(1,1,1,1,i),rv2u(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(sv2u_2d(1,1,1,1,i),sv2u(1,1,1,1,i),w1,w2)
-C         enddo
-C         do i =1,4
-C           call planar_avg(summ(1,1,1,1,i),rumm(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(summ_2d(1,1,1,1,i),summ(1,1,1,1,i),w1,w2)
-C           call planar_avg(su2m(1,1,1,1,i),ru2m(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(su2m_2d(1,1,1,1,i),su2m(1,1,1,1,i),w1,w2)
-C           call planar_avg(su3m(1,1,1,1,i),ru3m(1,1,1,1,i),igs_x) !x averaging
-C           call x_slice(su3m_2d(1,1,1,1,i),su3m(1,1,1,1,i),w1,w2)
-C C           call planar_avg(spmm(1,1,1,1,i),rpmm(1,1,1,1,i),igs_x) !x averaging
-C C           call x_slice(spmm_2d(1,1,1,1,i),spmm(1,1,1,1,i),w1,w2)
-C         enddo
-C          if (restart_means.eq.0) call output_means(atime,timel,dtime,w4)
-C       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
 
-      if (istep.ne.0 .and.mod(istep,int(iostep_2d_avg_time)).eq.0) then
+      if (istep.ne.0 .and. 
+     &    mod(istep,int(iostep_2d_avg_time)).eq.0) then
 c     spanwise averaging
         do i =1,12
           call planar_avg(suxm(1,1,1,1,i),ruxm(1,1,1,1,i),igs_x) !x averaging
@@ -630,13 +662,17 @@ c     spanwise averaging
           if (nid.eq.0)call x_slice3(spmm_2d(1,1,1,1,i))
         enddo
         call nekgsync()
-         if (restart_means.eq.0) call output_means(atime,timel,dtime,w4)
+         if (restart_means.gt.0) then
+          call output_means(atime,timel,dtime,w4)
+         endif
       endif !(istep.gt.0 .and. mod(istep,int(iostep_2d_avg_time)).eq.0)
 c     ############################################################
 c     load restart statistics and average them with the new ones 
-      if(restart_means.ne.0 .and. 
+      if(restart_means.lt.0 .and.nid.eq.0 .and.
      &  mod(istep,int(iostep_2d_avg_time)).eq.0 .and. istep.ne.0) then
-        call input_means(timem,atimem,timelm,dtimem)
+        if (istep.eq.int(iostep_2d_avg_time)) then !this variables remain in a common block, it's not necessary to load them everytime
+          call input_means()
+        endif
         t_tot=atime+atimem
         alpha=atime/t_tot
         beta=1-alpha
@@ -674,70 +710,7 @@ c     load restart statistics and average them with the new ones
      &        m,'pavg',ifverbose)
         enddo
         call output_means(t_tot,timel,dtime,w4)
-      endif !(restart_means.eq.1 .and. istep.eq.iostep_2d_avg_time)
-c     ############################################################
-c     write 2d spanwise-averaged files 
-      if(mod(istep,int(iostep_2d_notime)).eq.0) then
-C           if(istep.eq.0)then
-C               call x_slice(y2d,ym1,w1,w2)
-C               call x_slice(z2d,zm1,w1,w2)
-C               icnt_time=1
-C           endif
-          call planar_avg(wo1,vz,igs_x) 
-C           call x_slice(w2d,wo1,w1,w2)
-          call x_slice2(wo1,w1)
-          if (nid.eq.0) call x_slice3(w2d)
-
-
-          call planar_avg(wo1,vy,igs_x) 
-C           call x_slice(v2d,wo1,w1,w2)
-          call x_slice2(wo1,w1)
-          if (nid.eq.0) call x_slice3(v2d)
-
-          call planar_avg(wo1,t(1,1,1,1,1),igs_x) 
-C           call x_slice(tt2d,wo1,w1,w2)
-          call x_slice2(wo1,w1)
-          if (nid.eq.0) call x_slice3(tt2d)
-          call nekgsync()
-C           call outfld2d_yz(z2d,y2d,w2d,v2d,tt2d,ly1,lz1,lely,lelz,'sag',
-C      &       icnt_time)
-C           icnt_time=icnt_time+1
-          call output_2d(time,w2d,v2d,tt2d)
-      endif
-
-
-c     ############################################################
-c     COMPUTE HYDROSTATIC PRESSURE (AVERAGE OF TEMP(y))
-c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
-      call rzero(tempbar,m) !wo1,2(lx1,ly1,lz1,lelv)
-      call cfill(wintr,151413121110987654321.,size(wintr))
-      call rzero(tline,myint)
-      call planar_avg(wo1,t(1,1,1,1,1),igs_x)  !wo1,2(lx1,ly1,lz1,lelv)
-
-      call interp_nfld(wintr,wo1,1,xint,yint,zint,INTP_NMAX,
-     $                       iwk,rwk,INTP_NMAX,iffpts,intp_h)
-      if(nid.eq.0) then
-        do i=1,myint
-          zdum=0.0
-          do j=1,mz
-              k=i+(j-1)*myint
-              if (wintr(k).ne.151413121110987654321.) then
-                tline(i)=tline(i)+wintr(k)*deltaz
-                zdum=zdum+deltaz
-              endif
-            enddo
-          tline(i)=tline(i)/zdum
-        enddo
-        call spline(y_inter,tline,myint,wintr2,wintr3)
-        do i=1,m
-          call splint(y_inter,tline,wintr2,myint,ymm(i,1,1,1),
-     $         tempbar(i,1,1,1))
-        enddo
-      endif
-      call rzero(w1,m)
-      call gop(tempbar,w1,'+  ',m)
-
-c     ############################################################
+      endif !(restart_means.lt.0 .and. istep.eq.iostep_2d_avg_time)
 
       return
       end
@@ -1593,13 +1566,11 @@ c
        end
 
 
-      subroutine input_means(time_old,atime,timel,dtime)
+      subroutine input_means()
       include 'SIZE'
       include 'TOTAL'
       include 'ZPER'
 
-      real time_old
-      real atime,timel,dtime
       real w4(ly1,lz1,lely,lelz)
       integer dumm
 
@@ -1612,6 +1583,7 @@ c
      & , su3m_2d_o(lx1,ly1,lz1,lelt,4)
      & , sv2u_2d_o(lx1,ly1,lz1,lelt,6)
      & , spmm_2d_o(lx1,ly1,lz1,lelt,4)
+     & ,timem,atimem,timelm,dtimem,t_tot
 
       m=ny1*nz1*lely*lelz
 
@@ -1628,7 +1600,7 @@ c
          write(*,*)'*********Reading means file: means.ini....*********'
          open(unit=58,file='means.ini',access='stream',
      &     form='unformatted')
-         read(58) time_old, atime,timel,dtime
+         read(58) timem,atimem,timelm,dtimem
          read(58) dumm,dumm,dumm,dumm
          do i=1,4
           read(58) w4
@@ -1664,30 +1636,30 @@ c
          enddo
          close(58)
        endif
-      do i=1,4
-          call gop(summ_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,4
-          call gop(su2m_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,6
-          call gop(suvm_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,12
-          call gop(suxm_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,12
-          call gop(sux2_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,4
-          call gop(su3m_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,6
-          call gop(sv2u_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
-      do i=1,4
-          call gop(spmm_2d_o(1,1,1,1,i),w4,'+  ',m)
-      enddo
+C       do i=1,4
+C           call gop(summ_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,4
+C           call gop(su2m_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,6
+C           call gop(suvm_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,12
+C           call gop(suxm_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,12
+C           call gop(sux2_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,4
+C           call gop(su3m_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,6
+C           call gop(sv2u_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
+C       do i=1,4
+C           call gop(spmm_2d_o(1,1,1,1,i),w4,'+  ',m)
+C       enddo
       return
       end
 

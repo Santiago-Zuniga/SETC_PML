@@ -25,14 +25,14 @@ filterModes=2
 
 userParam01 = 10        # Ri_tau
 userParam02 = 200       # Ri_tau2, downstream from slope break
-userParam03 = -0.08     # u_target for top PML, positive 
+userParam03 = -0.08     # u_target for top PML, positive. If negative, a constant velocity will be used instead of a PML.
 userParam04 = 10        # viscosity multiplier at ouflow
 userParam05 = 0         # whether to read inflow2d.ini (2d) for restasting
-userParam06 = 0         # whether to read means.ini for means restasting
-userParam07 = 10000     # output frequency for spanwise-time-averaged statistics
+userParam06 = 10000     # output frequency for spanwise-time-averaged statistics. If <0, means.ini will be read for restarting
+userParam07 = 0         # step for which means over time will start being accumated. If <0, means will only be spanwise-averaged.
 userParam08 = 100       # output frequency for spanwise-averaged statistic
 userParam09 = 20.0      # y lenght
-userParam09 = 32.0	# z lenght / pi
+userParam10 = 32.0	# z lenght / pi
 
 [MESH]
 numberOfBCFields = 2
