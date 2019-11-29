@@ -532,7 +532,8 @@ c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
 
 c     ############################################################
 
-      if (istep.lt.int(iostep_start)) return
+      if (istep.lt.int(iostep_start) 
+     &  .and.restart_means.gt.0)  return
 
 c     averaging over time
       if (atime.ne.0 .and. dtime.ne.0 .and. istep.ne.0 ) then
