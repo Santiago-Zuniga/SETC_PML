@@ -21,6 +21,7 @@ c - mesh and buffer zones dimensions
 #define NUMBER_ELEMENTS_X lelx
 #define NUMBER_ELEMENTS_Y lely
 #define NUMBER_ELEMENTS_Z lelz
+#define ratiozh 3.0       /*fraction of domain before the break*/
 
 c - Iflow dimensions
 #define nelxin 8              /*number of elements of inflow array */
@@ -826,13 +827,14 @@ c-----------------------------------------------------------------------
       
       integer n,nelytot,mmnely
       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y,z
-      real theta1, theta2, A1, A2, zh, anint
+      real theta1, theta2, A1, A2, zh1, zh2, anint
 
       theta1=atan(1/RITAU)
       theta2=atan(1/RITAU2)
-      zh=(ZLEN)/2.0
-      A1=zh/RITAU   !zh*tan(theta)
-      A2=zh/RITAU2
+      zh1=aint(NUMBER_ELEMENTS_Z/ratiozh)*ZLEN/NUMBER_ELEMENTS_Z
+      zh2=ZLEN-zh1
+      A1=zh1/RITAU   !zh*tan(theta)
+      A2=zh2/RITAU2
 C       A1=0
 C       A2=0
       n=8*nelt
@@ -871,21 +873,21 @@ c     sloping
       do i=1,n
         y=yc(i,1)
         z=zc(i,1)
-        if((AINT(z*100.0)/100.0).lt.zh) then
+        if((AINT(z*100.0)/100.0).lt.zh1) then
           if((AINT(y*100.0)/100.0).le.hint) then
-            yc(i,1)=y+A1*((-1.0/zh)*z+1)+A2
+            yc(i,1)=y+A1*((-1.0/zh1)*z+1)+A2
           else
             yc(i,1)=y+((-A1/(YLEN-hint))*(y-hint)+A1)*
-     &                ((-1.0/zh)*z+1)+
+     &                ((-1.0/zh1)*z+1)+
      &                ((-A2/(YLEN-hint))*(y-hint)+A2)
           endif !(y.le.hfint)
         else
           if((AINT(y*100.0)/100.0).le.hint) then
-            yc(i,1)=y+A2*((-1.0/zh)*(z-zh)+1)
+            yc(i,1)=y+A2*((-1.0/zh2)*(z-zh1)+1)
           else
             yc(i,1)=y+((-A2/(YLEN-hint))*
-     &         (y-hint)+A2)*((-1.0/zh)*
-     &                (z-zh)+1)
+     &         (y-hint)+A2)*((-1.0/zh2)*
+     &                (z-zh1)+1)
           endif !(y.le.hfint)
         endif !(z.lt.zh)
       enddo
