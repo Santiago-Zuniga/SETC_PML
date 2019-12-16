@@ -22,6 +22,7 @@ c - mesh and buffer zones dimensions
 #define NUMBER_ELEMENTS_Y lely
 #define NUMBER_ELEMENTS_Z lelz
 #define ratiozh 3.0       /*fraction of domain before the break*/
+#define nhighz 0         /*number of high resolution elements near the break*/
 
 c - Iflow dimensions
 #define nelxin 8              /*number of elements of inflow array */
@@ -723,6 +724,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       include 'NEKUSE'
+      include 'NEKNEK'
 
 c     ############################################################
 c     INFLOW FROM INTERPOLATED EXTERNAL FILE
@@ -736,6 +738,9 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       real ewfac
       integer if_pml
       save if_pml
+      integer e
+
+      e = gllel(ieg)
 
       if (istep.eq.0)then
        if (UTARGET.lt.0.)then
@@ -750,6 +755,14 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       uz   = 0.
       temp = 0.
 c     ############################################################
+c     STABILIZED OUTFLOW Dong et all JCP
+      if (cbu.eq.'o  ') then
+         U0 = 1.0                  ! characteristic velocity
+         delta = 0.1               ! small positive constant
+         pa = dongOutflow(ix,iy,iz,e,iside,U0,delta)
+      endif
+
+
 c     ############################################################
 c     INFLOW FROM INTERPOLATED EXTERNAL FILE
 
@@ -828,9 +841,12 @@ c-----------------------------------------------------------------------
       integer n,nelytot,mmnely
       real hfh,hfint,amp,delyi,rrleny,rrlenyint,y,z
       real theta1, theta2, A1, A2, zh1, zh2, anint
+      real deltz1, deltz0
+      integer nz_break
 
       theta1=atan(1/RITAU)
       theta2=atan(1/RITAU2)
+      nz_break=aint(NUMBER_ELEMENTS_Z/ratiozh)
       zh1=aint(NUMBER_ELEMENTS_Z/ratiozh)*ZLEN/NUMBER_ELEMENTS_Z
       zh2=ZLEN-zh1
       A1=zh1/RITAU   !zh*tan(theta)
@@ -868,6 +884,26 @@ C             yc(i,1)=y*(YLEN-hfint)+hfint
         xc(i,1) =  XLEN * xc(i,1)
         zc(i,1) = ZLEN * zc(i,1)
       enddo
+
+      if (nhighz.ne.0) then
+        deltz1=ZLEN/(1.0*NUMBER_ELEMENTS_Z-1.0*nhighz/2.0)
+        deltz0=ZLEN/NUMBER_ELEMENTS_Z
+        do i=1,n
+          z=zc(i,1)
+          if ((AINT(z*100.0)/100.0).le.(deltz0*(nz_break-nhighz/2)))then
+            zc(i,1)=z*(zh1-nhighz/4*deltz1)/((nz_break-nhighz/2)*deltz0)
+          elseif((AINT(z*100.0)/100.0).le.(deltz0*(nz_break+nhighz/2)))
+     &          then
+            zc(i,1)=0.5*(deltz1/deltz0)*(z-(nz_break-nhighz/2)
+     &              *deltz0)+zh1-nhighz*deltz1/4
+          else
+            zc(i,1)=(ZLEN-zh1+nhighz*deltz0/4)/
+     &              (ZLEN-(nhighz*deltz1/2))*
+     &              (z-(nz_break+nhighz/2)*deltz0)
+     &              +zh1+nhighz*deltz1/4
+          endif
+        enddo
+      endif
 
 c     sloping
       do i=1,n
@@ -1925,3 +1961,25 @@ c     -----------------------------------------------------
        endif
        return
        end
+
+      function dongOutflow(ix,iy,iz,iel,iside,u0,delta)
+
+      include 'SIZE'
+      include 'SOLN'
+      include 'GEOM'
+
+      real sn(3)
+
+      ux = vx(ix,iy,iz,iel)
+      uy = vy(ix,iy,iz,iel)
+      uz = vz(ix,iy,iz,iel)
+
+      call getSnormal(sn,ix,iy,iz,iside,iel)
+      vn = ux*sn(1) + uy*sn(2) + uz*sn(3) 
+      S0 = 0.5*(1.0 - tanh(vn/u0/delta))
+
+      dongOutflow = -0.5*(ux*ux+uy*uy+uz*uz)*S0
+
+      return
+      end
+C-----------------------------------------------------------------------
