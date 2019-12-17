@@ -739,6 +739,7 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       integer if_pml
       save if_pml
       integer e
+      real theta1,chr,shr
 
       e = gllel(ieg)
 
@@ -761,17 +762,19 @@ c     STABILIZED OUTFLOW Dong et all JCP
          delta = 0.1               ! small positive constant
          pa = dongOutflow(ix,iy,iz,e,iside,U0,delta)
       endif
-
-
 c     ############################################################
 c     INFLOW FROM INTERPOLATED EXTERNAL FILE
+
+      theta1=atan(1.0/RITAU)
+      chr=cos(theta1)
+      shr=sin(theta1)
 
       if (if_pml.eq.1) then
         if (ifield .eq. 1) then               ! velocity
           if(ieg.le.nel_slab.and.iside.eq.5) then
             ux  = vxin_pl(ix,iy,ieg)
-            uy  = vyin_pl(ix,iy,ieg)
-            uz  = vzin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)*chr-vzin_pl(ix,iy,ieg)*shr
+            uz  = vzin_pl(ix,iy,ieg)*chr+vyin_pl(ix,iy,ieg)*shr
           endif
         elseif (ifield .eq. 2) then     !temperature
           temp = 0.0
@@ -801,8 +804,8 @@ c           This coflow is only for the top wall of the domain
 
           elseif(ieg.le.nel_slab.and.iside.eq.5) then
             ux  = vxin_pl(ix,iy,ieg)
-            uy  = vyin_pl(ix,iy,ieg)
-            uz  = vzin_pl(ix,iy,ieg)
+            uy  = vyin_pl(ix,iy,ieg)*chr-vzin_pl(ix,iy,ieg)*shr
+            uz  = vzin_pl(ix,iy,ieg)*chr+vyin_pl(ix,iy,ieg)*shr
           endif
 
         elseif (ifield .eq. 2) then     !temperature
