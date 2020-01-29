@@ -814,7 +814,7 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
         zstart = 0                    !<----------------------CHANGE
         zstart1 = zstart + 1.         !<----------------------CHANGE
         zendbr = zh1 +10
-        zendbr1 =zendbr +1
+        zendbr1 =zendbr +10
         zend = ZLEN
         zend1 = zend - 1.             !<----------------------CHANGE
         z_real =(AINT(z*100.0)/100.0)
@@ -828,7 +828,8 @@ c           This coflow is only for the top wall of the domain
               elseif (z_real.ge.zstart1.and.z_real.le.zendbr) then
                 uy= (-1)*ewfac
               elseif(z_real.ge.zendbr.and.z_real.le.zendbr1) then
-                uy=((z-zendbr1+1.)**8 - 1.)*ewfac*(1.-1.0/ratio_top_uy)
+                uy=(((z-zendbr1)/(zendbr1-zendbr)+1.)**1 - 1.)*
+     &             ewfac*(1.-1.0/ratio_top_uy)
      &             -(ewfac/ratio_top_uy)
               elseif (z_real.ge.zendbr1.and.z_real.le.zend1) then
                 uy= (-1)*(ewfac/ratio_top_uy)
