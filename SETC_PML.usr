@@ -81,7 +81,7 @@ C
 
 c     BUFFER ZONE VARIABLES
       real*8 sigma2(3),sigmam1(3),sigmam2(3),beta  !changed sigma to sigma2
-     $        ,umean1(3),umean2(3),yy,zz,m,vzout,zz2
+     $        ,umean1(3),umean2(3),yy,zz,m,vzout,zz2,z_break
       integer if_pml
       save if_pml
       common /outflow_pl/ vzout_pl(lx1,ly1,lelx,lely)
@@ -138,6 +138,9 @@ c     Buffer zones
      & + ZBUFF
         yy = m * (z-ZBUFF)
      & + YBUFF
+      z_break=NUMBER_ELEMENTS_Z-AINT(z_super/(ZLEN/NUMBER_ELEMENTS_Z))
+      z_break=z_break*(ZLEN/NUMBER_ELEMENTS_Z)
+      zz=zz-z_break
 
 c     ###############
 c     Top buffer zone
@@ -765,7 +768,7 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       integer if_pml
       save if_pml
       integer e
-      real theta1,chr,shr,zh1,z_real
+      real theta1,chr,shr,zh1,z_real,z_break
 
       e = gllel(ieg)
 
@@ -796,6 +799,8 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       shr=sin(theta1)
 
       zh1=aint(NUMBER_ELEMENTS_Z/ratiozh)*ZLEN/NUMBER_ELEMENTS_Z !break
+      z_break=NUMBER_ELEMENTS_Z-AINT(z_super/(ZLEN/NUMBER_ELEMENTS_Z))
+      z_break=z_break*(ZLEN/NUMBER_ELEMENTS_Z) !supercritical outflow 
 
       if (if_pml.eq.1) then
         if (ifield .eq. 1) then               ! velocity
@@ -816,7 +821,7 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
         zstart1 = zstart + 1.         !<----------------------CHANGE
         zendbr = zh1 +10
         zendbr1 =zendbr +10
-        zend = ZLEN
+        zend = z_break
         zend1 = zend - 1.             !<----------------------CHANGE
         z_real =(AINT(z*100.0)/100.0)
 
