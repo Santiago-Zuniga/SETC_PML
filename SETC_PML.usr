@@ -970,7 +970,7 @@ c     sloping
 
 c     outflow supercritical break
       if(z_super.ne.0) then
-      z_break=NUMBER_ELEMENTS_Z-AINT(z_super./(ZLEN/NUMBER_ELEMENTS_Z))
+      z_break=NUMBER_ELEMENTS_Z-AINT(z_super/(ZLEN/NUMBER_ELEMENTS_Z))
       z_break=z_break*(ZLEN/NUMBER_ELEMENTS_Z)
       a_break=z_super/5.0
       do i=1,n
@@ -1003,10 +1003,10 @@ c     outflow supercritical break
           enddo
       endif
 
-      z_break=NUMBER_ELEMENTS_Z-AINT(z_super./(ZLEN/NUMBER_ELEMENTS_Z))
+      z_break=NUMBER_ELEMENTS_Z-AINT(z_super/(ZLEN/NUMBER_ELEMENTS_Z))
       z_break=z_break*(ZLEN/NUMBER_ELEMENTS_Z)
       
-      if (.true.) then  !!!this will add an outflow zone with a wall condition at top
+      if (z_super.ne.0) then  !!!this will add an outflow zone with a wall condition at top
       if (nid.eq.0) write(*,*) 'Outflow break will be at z=',
      &              z_break,', zlen=',ZLEN
         ifc=3
