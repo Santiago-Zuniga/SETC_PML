@@ -17,13 +17,14 @@ c - mesh and buffer zones dimensions
 #define XLEN (8.0*PI/3.0)
 #define YLEN uparam(9)
 #define ZLEN (uparam(10)*PI)
-#define ZBUFF (ZLEN-PI)
-#define YBUFF 12.
+#define ZBUFF (ZLEN-3.0*PI)
+#define YBUFF (YLEN-8.)
 #define NUMBER_ELEMENTS_X lelx
 #define NUMBER_ELEMENTS_Y lely
 #define NUMBER_ELEMENTS_Z lelz
 #define ratiozh 3.0       /*fraction of domain before the break*/
 #define nhighz 0         /*number of high resolution elements near the break*/
+#define ratio_top_uy 2.0    /*ratio of the velocity at the top of the domain between zones, if a preset velocity is used*/
 
 c - Iflow dimensions
 #define nelxin 8              /*number of elements of inflow array */
@@ -79,10 +80,11 @@ C
       integer ex,ey,ez
 
 c     BUFFER ZONE VARIABLES
-      real*8 sigma2(3),sigmam1(3),sigmam2(3),beta,ybuff  !changed sigma to sigma2
-     $        ,zbuff,umean1(3),umean2(3),yy,zz,m,vzout
+      real*8 sigma2(3),sigmam1(3),sigmam2(3),beta  !changed sigma to sigma2
+     $        ,umean1(3),umean2(3),yy,zz,m,vzout,zz2
       integer if_pml
       save if_pml
+      common /outflow_pl/ vzout_pl(lx1,ly1,lelx,lely)
 
       if (istep.eq.0)then
        if (UTARGET.lt.0.)then
@@ -129,10 +131,13 @@ c     Buffer zones
         umean2(2) = 0.0                           !<-----------------CHANGE! 
         umean2(3) = 0.0                           !<-----------------CHANGE! 
 
-        m=(YLEN-YBUFF)/(ZLEN
+        m=(YLEN-YBUFF)/
+     &   (ZLEN
      &    -ZBUFF)
-        zz = (y-YBUFF)/m + ZBUFF
-        yy = m * (z-ZBUFF) + YBUFF
+        zz = (y-YBUFF)/m 
+     & + ZBUFF
+        yy = m * (z-ZBUFF)
+     & + YBUFF
 
 c     ###############
 c     Top buffer zone
@@ -140,34 +145,60 @@ c     Top buffer zone
         sigma2(2) = 0.0
         sigma2(3) = 0.0
         if (y.ge.YBUFF.and.z.le.zz) then
-          sigma2(1) = sigmam1(1)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-          sigma2(2) = sigmam1(2)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
-          sigma2(3) = sigmam1(3)*((y - YBUFF)/(YLEN-YBUFF))**(beta)
+          sigma2(1) = sigmam1(1)*((y - YBUFF)/
+     &      (YLEN-YBUFF))**(beta)
+          sigma2(2) = sigmam1(2)*((y - YBUFF)/
+     &       (YLEN-YBUFF))**(beta)
+          sigma2(3) = sigmam1(3)*((y - YBUFF)/
+     &       (YLEN-YBUFF))**(beta)
 
           ffx = ffx - sigma2(1) * (ux - umean1(1))
           ffy = ffy - sigma2(2) * (uy - umean1(2)) 
           ffz = ffz - sigma2(3) * (uz - umean1(3))
         endif
+      endif !if_pml.eq.1
 c     ###################
 c     Outflow buffer zone
-C       if(.FALSE.) then
-C           sigma2(1) = 0.0
-C           sigma2(2) = 0.0
-C           sigma2(3) = 0.0
-C           call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
-C           vzout = vzout_pl(ix,iy,ex,ey)
-C           if (z.ge.ZBUFF.and.y.lt.yy.and.vzout.lt.0.0) then
-C             sigma2(1) = sigmam2(1)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
-C             sigma2(2) = sigmam2(2)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
-C             sigma2(3) = sigmam2(3)*((z - ZBUFF)/(ZLEN - ZBUFF))**(beta)
+      if(.true.) then
+          sigma2(1) = 0.0
+          sigma2(2) = 0.0
+          sigma2(3) = 0.0
 
-C             ffx = ffx - sigma2(1) * (ux - umean2(1))
-C             ffy = ffy - sigma2(2) * (uy - umean2(2))
-C             ffz = ffz - sigma2(3) * (uz - umean2(3))
-C           endif
-C       endif
-c     ####################
+          sigmam2(1) = 0.0                          !<-----------------CHANGE!
+          sigmam2(2) = 0.0                          !<-----------------CHANGE!
+          sigmam2(3) = 100.0                          !<-----------------CHANGE!
+
+          umean2(1) = 0.0                           !<-----------------CHANGE! 
+          umean2(2) = 0.0                           !<-----------------CHANGE! 
+          umean2(3) = 0.0                           !<-----------------CHANGE!
+
+          beta = 2.0
+
+          zz2=(z-ZBUFF)/
+     &      (ZLEN
+     &      -ZBUFF)
+          m=(YLEN-YBUFF)/
+     &   (ZLEN
+     &    -ZBUFF)
+          yy = m * (z-ZBUFF)
+     & + YBUFF
+
+          call get_exyz(ex,ey,ez,eg,nelx,nely,nelz)
+          vzout = vzout_pl(ix,iy,ex,ey)
+C           if (z.ge.ZBUFF
+C      &      .and.y.lt.yy.and.vzout.lt.0.0) then
+          if (z.ge.ZBUFF
+     &      .and.vzout.lt.0.0) then
+            sigma2(1) = sigmam2(1)*(zz2)**(beta)
+            sigma2(2) = sigmam2(2)*(zz2)**(beta)
+            sigma2(3) = sigmam2(3)*(zz2)**(beta)
+
+            ffx = ffx - sigma2(1) * (ux - umean2(1))
+            ffy = ffy - sigma2(2) * (uy - umean2(2))
+            ffz = ffz - sigma2(3) * (uz - umean2(3))
+          endif
       endif
+c     ################# 
 
 
       return
@@ -372,8 +403,10 @@ c     HYDROSTATIC PRESSURE VARIABLES
       common /TBAR/ tempbar(ly1,lz1,lely,lelz)
       
       common /VS_GRADT/ vsgradt(lx1,ly1,lz1,lelt)
-
       common /VS_VEC/ vs(3)
+      
+      common /outflow_pl/ vzout_pl(lx1,ly1,lelx,lely)
+      real vzout_pldum(lx1,ly1,lelx,lely)
 
       parameter (llt=lx1*ly1*lz1*lelt)
       common /cmygeom/ xmo(llt),ymo(llt),zmo(llt)
@@ -552,6 +585,11 @@ c     FOR REFERENCE ON THIS TERM SEE CANTERO 2009 JGR
       endif
       call rzero(w1,m)
       call gop(tempbar,w1,'+  ',m)
+
+c      ############################################################
+c     SAVE OUTFLOW PLANE
+
+      call vz_outflow(vzout_pl,vzout_pldum)
 
 c     ############################################################
 
@@ -760,7 +798,7 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       integer if_pml
       save if_pml
       integer e
-      real theta1,chr,shr
+      real theta1,chr,shr,zh1,z_real
 
 c     VS*GRAD(TEMP) BC VARIABLES
       real sn(3)
@@ -794,6 +832,8 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
       chr=cos(theta1)
       shr=sin(theta1)
 
+      zh1=aint(NUMBER_ELEMENTS_Z/ratiozh)*ZLEN/NUMBER_ELEMENTS_Z !break
+
       if (if_pml.eq.1) then
         if (ifield .eq. 1) then               ! velocity
           if(ieg.le.nel_slab.and.iside.eq.5) then
@@ -811,19 +851,28 @@ c     INFLOW FROM INTERPOLATED EXTERNAL FILE
         ewfac = -1.0*UTARGET          
         zstart = 0                    !<----------------------CHANGE
         zstart1 = zstart + 1.         !<----------------------CHANGE
+        zendbr = zh1 +10
+        zendbr1 =zendbr +10
         zend = ZLEN
         zend1 = zend - 1.             !<----------------------CHANGE
+        z_real =(AINT(z*100.0)/100.0)
 
         if (ifield .eq. 1) then               ! velocity
           if (iside.eq.3) then
               ux = 0.0
 c           This coflow is only for the top wall of the domain
-              if (z.ge.zstart.and.z.le.zstart1) then
+              if (z_real.ge.zstart.and.z_real.le.zstart1) then
                 uy= ((z-zstart-1.)**8 - 1.)*ewfac
-              elseif (z.ge.zstart1.and.z.le.zend1) then
+              elseif (z_real.ge.zstart1.and.z_real.le.zendbr) then
                 uy= (-1)*ewfac
-              elseif (z.ge.zend1.and.z.le.zend) then
-                uy= ((z-zend+1.)**8 - 1.)*ewfac
+              elseif(z_real.ge.zendbr.and.z_real.le.zendbr1) then
+                uy=(((z-zendbr1)/(zendbr1-zendbr)+1.)**1 - 1.)*
+     &             ewfac*(1.-1.0/ratio_top_uy)
+     &             -(ewfac/ratio_top_uy)
+              elseif (z_real.ge.zendbr1.and.z_real.le.zend1) then
+                uy= (-1)*(ewfac/ratio_top_uy)
+              elseif (z_real.ge.zend1.and.z_real.le.zend) then
+                uy= ((z-zend+1.)**8 - 1.)*(ewfac/ratio_top_uy)
               endif
               uz = 0.0
 
@@ -2028,3 +2077,33 @@ c     -----------------------------------------------------
       return
       end
 C-----------------------------------------------------------------------
+      subroutine vz_outflow(vzout,w)
+
+      include 'SIZE'
+      include 'SOLN'
+      include 'GEOM'
+      include 'ZPER'
+      include 'PARALLEL'
+      include 'WZ'
+
+      real vzout(lx1,ly1,lelx,lely),w(lx1,ly1,lelx,lely)
+      integer e,eg,ex,ey,ez, m
+
+      m=lx1*ly1*lelx*lely
+      call rzero(vzout,m)
+      call rzero(w,m)
+      do e=1,nelv
+        eg = lglel(e)
+        call get_exyz(ex,ey,ez,eg,lelx,lely,lelz)
+        if (ez.eq.lelz) then
+          do j=1,ny1
+            do i=1,nx1  
+              w(i,j,ex,ey)= vz(i,j,lz1,e)
+            enddo
+          enddo
+        endif
+      enddo
+      call gop(w,vzout,'+  ',m)
+
+      return 
+      end
